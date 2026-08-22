@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-src 'none'; base-uri 'self'; connect-src 'self' ws: wss:;">
+<title>LiftBuilder Platform</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --dark:#0E0E0E;--dark2:#1a1a1a;--dark3:#252525;--dark4:#2e2e2e;
+  --white:#F0F4F8;--muted:#666;
+  --gold:#C9A84C;--gold-a15:rgba(201,168,76,.15);--gold-a30:rgba(201,168,76,.3);--gold-a50:rgba(201,168,76,.5);
+  --green:#5EC08A;--red:#E07070;
+}
+body{background:var(--dark);color:var(--white);font-family:Arial,sans-serif;height:100vh;display:grid;grid-template-rows:auto 1fr;overflow:hidden;}
+
+/* ── Header ── */
+#hdr{background:#161616;border-bottom:2px solid var(--gold);padding:10px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+#hdr-platform{font-family:'Barlow Condensed',Arial,sans-serif;font-size:22px;font-weight:700;letter-spacing:1px;}
+#hdr-meet{font-size:14px;color:var(--muted);flex:1;}
+#hdr-phase{font-size:12px;font-weight:700;letter-spacing:2px;padding:3px 12px;border-radius:4px;background:var(--gold-a15);color:var(--gold);}
+#hdr-bar{display:none;font-size:12px;font-weight:700;padding:3px 12px;border-radius:4px;background:rgba(94,192,138,.15);color:var(--green);letter-spacing:.5px;}
+#conn-badge{font-size:11px;font-weight:700;letter-spacing:1px;padding:2px 10px;border-radius:4px;}
+#conn-badge.ok{background:rgba(94,192,138,.15);color:var(--green);}
+#conn-badge.off{background:rgba(224,112,112,.15);color:var(--red);}
+
+/* ── Layout ── */
+#main{display:grid;grid-template-columns:5fr 3fr;height:100%;overflow:hidden;}
+#left{padding:20px 24px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;}
+#right{background:#141414;border-left:1px solid #222;padding:16px 20px;overflow-y:auto;}
+
+/* ── Buttons ── */
+.btn{border:none;border-radius:5px;cursor:pointer;font-family:'Barlow Condensed',Arial,sans-serif;font-weight:700;letter-spacing:.5px;transition:opacity .15s;}
+.btn:disabled{opacity:.35;cursor:default;}
+.btn-gold{background:var(--gold);color:#000;padding:8px 20px;font-size:14px;}
+.btn-gold:hover:not(:disabled){opacity:.85;}
+.btn-outline{background:none;border:1px solid var(--dark4);color:var(--white);padding:8px 16px;font-size:13px;}
+.btn-outline:hover:not(:disabled){border-color:var(--muted);}
+.btn-good{background:#1e3d2a;border:2px solid var(--green);color:var(--green);border-radius:6px;padding:14px 26px;font-size:16px;font-weight:700;cursor:pointer;}
+.btn-good:hover{background:#2a5a3a;}
+.btn-miss{background:#3d1e1e;border:2px solid var(--red);color:var(--red);border-radius:6px;padding:14px 26px;font-size:16px;font-weight:700;cursor:pointer;}
+.btn-miss:hover{background:#5a2a2a;}
+
+/* ── Cards ── */
+.card{background:var(--dark2);border:1px solid var(--dark3);border-radius:8px;}
+.card-gold{background:var(--dark2);border:2px solid var(--gold);border-radius:8px;padding:20px 24px;}
+.card-label{font-family:'Barlow Condensed',Arial,sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gold);margin-bottom:8px;}
+
+/* ── Bar control ── */
+#bar-card{padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+#bar-input{width:80px;background:var(--dark);color:var(--white);border:1px solid var(--gold-a50);border-radius:4px;padding:5px 8px;font-size:18px;font-family:'Barlow Condensed',Arial,sans-serif;font-weight:700;text-align:right;}
+.round-badge{font-family:'Barlow Condensed',Arial,sans-serif;font-size:16px;font-weight:700;padding:4px 14px;background:var(--dark3);border-radius:4px;}
+
+/* ── Now lifting ── */
+#now-card{padding:20px 24px;}
+#now-name{font-size:44px;font-weight:700;font-family:'Barlow Condensed',Arial,sans-serif;line-height:1;}
+#now-meta{font-size:15px;color:var(--muted);margin-top:4px;}
+#now-weight{font-size:62px;font-weight:700;font-family:'Barlow Condensed',Arial,sans-serif;color:var(--gold);line-height:1;margin-top:10px;}
+#now-weight span{font-size:24px;color:#555;}
+#now-ordinal{font-size:14px;color:var(--muted);margin-top:4px;}
+#now-dots{font-size:20px;margin-top:8px;}
+#now-clock{font-family:'Barlow Condensed',Arial,sans-serif;font-size:64px;font-weight:700;color:var(--green);margin-top:10px;letter-spacing:2px;display:none;}
+#now-actions{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;}
+
+/* ── Tables ── */
+.section-label{font-family:'Barlow Condensed',Arial,sans-serif;font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);padding:7px 12px;border-bottom:1px solid var(--dark3);}
+table{width:100%;border-collapse:collapse;}
+td{border-bottom:1px solid var(--dark3);}
+.td-p{padding:8px 12px;}
+.td-r{padding:8px 12px;text-align:right;}
+.muted{color:var(--muted);}
+.name-lg{font-size:15px;font-weight:600;}
+.name-sm{font-size:12px;color:var(--muted);}
+.wt-lg{font-family:'Barlow Condensed',Arial,sans-serif;font-size:17px;font-weight:700;}
+
+/* ── Phase done ── */
+#phase-done{display:none;background:var(--dark2);border:2px solid var(--green);border-radius:10px;padding:28px;text-align:center;}
+#phase-done-text{font-size:22px;font-weight:700;color:var(--green);margin-bottom:14px;}
+
+/* ── Waiting ── */
+#waiting-msg{display:none;background:var(--dark2);border:1px solid var(--dark3);border-radius:8px;padding:24px;text-align:center;color:var(--muted);font-size:15px;}
+
+/* ── Scoreboard ── */
+.sb-label{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px;}
+.wc-hd{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;background:#1c1c1c;padding:3px 8px;border-radius:3px;margin-bottom:5px;}
+.sr{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;margin-bottom:3px;}
+.sr.first{background:var(--gold-a15);}
+.sr-pl{font-size:17px;font-weight:700;width:22px;flex-shrink:0;color:var(--muted);}
+.sr-pl.gold{color:var(--gold);}
+.sr-name{flex:1;font-size:14px;font-weight:600;}
+.sr-sch{font-size:11px;color:var(--muted);}
+.sr-tot{font-size:20px;font-weight:700;color:var(--gold);}
+.sr-tot.bomb{color:var(--red);font-size:14px;}
+
+/* ── Modal ── */
+#modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;}
+#modal-box{background:#1e1e1e;border:1px solid var(--dark4);border-radius:10px;padding:28px;min-width:320px;max-width:480px;}
+#modal-box h3{font-family:'Barlow Condensed',Arial,sans-serif;font-size:18px;margin-bottom:4px;}
+#modal-box .sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+#modal-box input{width:100%;background:var(--dark);color:var(--white);border:1px solid var(--dark4);border-radius:4px;padding:10px;font-size:22px;font-family:'Barlow Condensed',Arial,sans-serif;font-weight:700;text-align:center;margin-bottom:16px;}
+#modal-box .modal-actions{display:flex;gap:10px;justify-content:flex-end;}
+
+/* ── No data ── */
+#no-data{display:none;align-items:center;justify-content:center;height:100%;font-size:22px;color:#333;flex-direction:column;gap:10px;}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  body{height:auto;min-height:100vh;overflow-y:auto;}
+  #main{grid-template-columns:1fr;height:auto;overflow:visible;}
+  #left{overflow-y:visible;}
+  #right{border-left:none;border-top:1px solid #222;padding:16px;}
+  #now-name{font-size:32px;}
+  #now-weight{font-size:46px;}
+  .btn-good,.btn-miss{padding:18px 22px;font-size:15px;flex:1;}
+}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div id="hdr-platform">Platform —</div>
+  <div id="hdr-meet">Connecting…</div>
+  <div id="hdr-phase">—</div>
+  <div id="hdr-bar"></div>
+  <div id="hdr-timer" style="display:none;font-family:'Barlow Condensed',Arial,sans-serif;font-size:20px;font-weight:700;letter-spacing:1px;padding:3px 12px;border-radius:4px;background:rgba(201,168,76,.15);color:var(--gold);"></div>
+  <button onclick="window.open('/display/'+platformNum+(_meetToken?'?pin='+_meetToken:''),'_blank')" style="font-size:11px;font-family:'Barlow Condensed',Arial,sans-serif;font-weight:700;padding:3px 10px;border:1px solid rgba(94,192,138,.4);border-radius:4px;background:none;color:#5EC08A;cursor:pointer;letter-spacing:.5px;">📺 Display</button>
+  <div id="conn-badge" class="off">OFFLINE</div>
+</div>
+
+<div id="main" style="display:none;">
+  <div id="left">
+    <!-- bar control -->
+    <div class="card" id="bar-card">
+      <span style="font-family:'Barlow Condensed',Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--gold);">BAR WEIGHT</span>
+      <input type="number" id="bar-input" min="45" step="5" placeholder="—">
+      <span style="font-size:13px;color:var(--muted);">lbs</span>
+      <button class="btn btn-gold" onclick="setBarWeight()" style="padding:6px 16px;font-size:13px;">Load</button>
+      <div style="width:1px;background:var(--dark4);height:20px;"></div>
+      <span id="round-badge" class="round-badge">1st Attempt</span>
+      <button id="next-round-btn" class="btn btn-outline" style="font-size:12px;padding:4px 12px;" onclick="advanceRound()">→ 2nd Attempt</button>
+      <div id="next-weight-wrap" style="margin-left:auto;display:none;align-items:center;gap:6px;">
+        <span style="font-size:12px;color:var(--muted);">Next weight:</span>
+        <button id="next-weight-btn" class="btn btn-outline" style="font-size:13px;padding:5px 14px;font-family:'Barlow Condensed',Arial,sans-serif;font-weight:700;"></button>
+      </div>
+    </div>
+
+    <!-- now lifting -->
+    <div class="card-gold" id="now-card" style="display:none;">
+      <div class="card-label" id="now-label">NOW LIFTING</div>
+      <div id="now-name">—</div>
+      <div id="now-meta"></div>
+      <div id="now-weight">— <span>lbs</span></div>
+      <div id="now-ordinal"></div>
+      <div id="now-dots"></div>
+      <div id="now-clock"></div>
+      <div id="now-clock-controls" style="display:none;margin-top:6px;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button id="btn-clock-pause"  onclick="pauseClock()"  style="font-family:'Barlow Condensed',Arial,sans-serif;font-size:14px;font-weight:700;padding:5px 14px;border:2px solid #E0A040;color:#E0A040;background:none;border-radius:5px;cursor:pointer;">⏸ Pause</button>
+        <button id="btn-clock-resume" onclick="resumeClock()" style="font-family:'Barlow Condensed',Arial,sans-serif;font-size:14px;font-weight:700;padding:5px 14px;border:2px solid #5EC08A;color:#5EC08A;background:none;border-radius:5px;cursor:pointer;display:none;">▶ Resume</button>
+        <button id="btn-clock-reset"  onclick="resetClock()"  style="font-family:'Barlow Condensed',Arial,sans-serif;font-size:14px;font-weight:700;padding:5px 14px;border:2px solid #E07070;color:#E07070;background:none;border-radius:5px;cursor:pointer;">✕ Reset</button>
+      </div>
+      <div id="now-result" style="display:none;margin-top:14px;"></div>
+      <div id="now-actions">
+        <button class="btn-good" id="btn-good" onclick="recordResult('good')">✓ GOOD LIFT</button>
+        <button class="btn-miss" id="btn-miss" onclick="recordResult('miss')">✗ NO LIFT</button>
+      </div>
+    </div>
+
+    <!-- waiting msg -->
+    <div id="waiting-msg"></div>
+
+    <!-- break timer (between phases) -->
+    <div class="card" id="break-card" style="display:none;padding:28px 24px;text-align:center;">
+      <div class="card-label" style="margin-bottom:4px;">BETWEEN PHASES</div>
+      <div id="break-phase-label" style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:12px;"></div>
+      <div id="break-clock" style="font-family:'Barlow Condensed',Arial,sans-serif;font-size:80px;font-weight:700;color:var(--green);letter-spacing:2px;line-height:1;"></div>
+      <div style="display:flex;gap:12px;justify-content:center;margin-top:20px;flex-wrap:wrap;">
+        <button id="btn-break-pause"  onclick="pauseBreak()"  style="font-family:'Barlow Condensed',Arial,sans-serif;font-size:14px;font-weight:700;padding:6px 18px;border:2px solid #E0A040;color:#E0A040;background:none;border-radius:5px;cursor:pointer;">⏸ Pause</button>
+        <button id="btn-break-resume" onclick="resumeBreak()" style="font-family:'Barlow Condensed',Arial,sans-serif;font-size:14px;font-weight:700;padding:6px 18px;border:2px solid var(--green);color:var(--green);background:none;border-radius:5px;cursor:pointer;display:none;">▶ Resume</button>
+        <button id="btn-break-reset"  onclick="resetBreak()"  style="font-family:'Barlow Condensed',Arial,sans-serif;font-size:14px;font-weight:700;padding:6px 18px;border:2px solid var(--red);color:var(--red);background:none;border-radius:5px;cursor:pointer;">✕ End Break</button>
+      </div>
+    </div>
+
+    <!-- on deck -->
+    <div class="card" id="deck-card" style="display:none;">
+      <div class="section-label">ON DECK</div>
+      <table id="deck-table"><tbody></tbody></table>
+    </div>
+
+    <!-- waiting -->
+    <div class="card" id="wait-card" style="display:none;">
+      <div class="section-label">WAITING — CHECK IN</div>
+      <table id="wait-table"><tbody></tbody></table>
+    </div>
+
+    <!-- completed -->
+    <div class="card" id="done-card" style="display:none;">
+      <div class="section-label" id="done-label">COMPLETED</div>
+      <table id="done-table"><tbody></tbody></table>
+    </div>
+
+    <!-- phase done -->
+    <div id="phase-done">
+      <div id="phase-done-text"></div>
+      <div id="break-picker" style="display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap;margin:16px 0 6px;">
+        <span style="font-size:12px;color:var(--muted);">Break:</span>
+        <button class="btn btn-outline bdur-btn" id="bdur-0"   onclick="selectDuration(0)"   style="font-size:12px;padding:4px 12px;border-color:var(--gold);color:var(--gold);">No Break</button>
+        <button class="btn btn-outline bdur-btn" id="bdur-300" onclick="selectDuration(300)"  style="font-size:12px;padding:4px 12px;">5 min</button>
+        <button class="btn btn-outline bdur-btn" id="bdur-600" onclick="selectDuration(600)"  style="font-size:12px;padding:4px 12px;">10 min</button>
+        <button class="btn btn-outline bdur-btn" id="bdur-900" onclick="selectDuration(900)"  style="font-size:12px;padding:4px 12px;">15 min</button>
+        <input id="bdur-custom" type="number" min="1" max="120" placeholder="min" title="Custom minutes" style="width:60px;background:var(--dark);color:var(--white);border:1px solid var(--dark4);border-radius:4px;padding:4px 6px;font-size:13px;text-align:center;" oninput="selectCustomDuration(this.value)">
+      </div>
+      <button class="btn btn-gold" id="phase-advance-btn" onclick="advancePhase()">Advance →</button>
+    </div>
+  </div>
+
+  <div id="right">
+    <div class="sb-label">LIVE SCOREBOARD</div>
+    <div id="scoreboard"></div>
+    <div id="team-section" style="margin-top:20px;border-top:1px solid #222;padding-top:16px;">
+      <div class="sb-label" style="margin-bottom:10px;">TEAM SCORES</div>
+      <div id="team-scores"></div>
+    </div>
+  </div>
+</div>
+
+<div id="no-data">
+  <div>No lifters assigned to this platform.</div>
+  <div style="font-size:14px;color:#444;">Ask the director to assign athletes in the meet setup.</div>
+</div>
+
+<!-- Declare modal -->
+<div id="modal-overlay" style="display:none;">
+  <div id="modal-box">
+    <h3 id="modal-title">Declare Next Attempt</h3>
+    <div id="modal-sub" class="sub"></div>
+    <input type="number" id="modal-weight" min="45" step="5">
+    <div class="modal-actions">
+      <button id="modal-scratch-btn" class="btn btn-outline" style="color:var(--red);border-color:var(--red);margin-right:auto;display:none;" onclick="scratchFromModal()">Scratch</button>
+      <button id="modal-skip-btn" class="btn btn-outline" onclick="closeModal()">Skip</button>
+      <button class="btn btn-gold" onclick="confirmDeclare()">Confirm →</button>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+'use strict';
+
+const platformNum  = parseInt(location.pathname.split('/').pop()) || 1;
+const _meetToken   = new URLSearchParams(location.search).get('pin') || '';
+const socket       = io({ auth: { token: _meetToken } });
+
+const STATUS_LABEL = { snatch:'Snatch', cj:'Clean & Jerk', bench:'Bench', complete:'Complete' };
+const ORDINALS = ['1st','2nd','3rd'];
+const GIRLS_WC = ['101','110','119','129','139','154','169','183','199','UNL'];
+const BOYS_WC  = ['119','129','139','154','169','183','199','219','238','HWT'];
+
+let _meet        = null;
+let _ps          = null; // platformStates[platformNum]
+let _currentId   = null; // entryId of NOW LIFTING lifter
+let _currentIdx  = null; // attemptIdx of NOW LIFTING lifter
+let _pending     = null; // { entryId, lift, nextIdx, minW } for declare modal
+
+function esc(s){ const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
+function _eligibleForLift(e,lift){
+  if(lift==='snatch') return e.discipline==='both'||e.discipline==='olympic'||e.discipline==='exhibition';
+  if(lift==='cj')     return true;
+  if(lift==='bench')  return e.discipline==='both'||e.discipline==='traditional'||e.discipline==='exhibition';
+  return false;
+}
+function _curIdx(e,lift){ return e[lift].findIndex(a=>a.result===null); }
+function _bestMade(atts){ const w=atts.filter(a=>a.result==='good').map(a=>a.declared); return w.length?Math.max(...w):0; }
+function _olympicTotal(e){ const s=_bestMade(e.snatch),c=_bestMade(e.cj); return s>0&&c>0?s+c:0; }
+function _traditionalTotal(e){ const c=_bestMade(e.cj),b=_bestMade(e.bench); return c>0&&b>0?c+b:0; }
+function _rankCmp(a,b){ if(b.tot!==a.tot) return b.tot-a.tot; const wA=parseFloat(a.e.weighIn)||parseFloat(a.e.wc)||999, wB=parseFloat(b.e.weighIn)||parseFloat(b.e.wc)||999; return wA-wB; }
+function _teamPoints(N){
+  if(N>=5) return [7,5,4,3,2,1];
+  if(N===4) return [6,4,3,2,1];
+  if(N===3) return [5,3,2,1];
+  return [5,3,1];
+}
+function _dots(atts,cur){
+  return atts.map((a,i)=>{
+    if(a.result==='good') return '<span style="color:var(--green);font-size:18px;">✓</span>';
+    if(a.result==='miss') return '<span style="color:var(--red);font-size:18px;">✗</span>';
+    if(i===cur)           return '<span style="color:var(--gold);font-size:18px;">●</span>';
+    return '<span style="color:#333;font-size:18px;">○</span>';
+  }).join(' ');
+}
+function _minDeclare(e,lift,attemptIdx){
+  if(attemptIdx===0) return 45;
+  const prev=e[lift][attemptIdx-1];
+  if(!prev||prev.result===null) return 45;
+  return prev.result==='good'?prev.declared+5:prev.declared;
+}
+function _checkInBlocked(e,lift,barWeight){
+  if(!barWeight) return false;
+  const done=e[lift].filter(a=>a.result!==null);
+  const hi=done.length?Math.max(...done.map(a=>a.declared)):0;
+  if(barWeight<hi) return true;
+  if(e[lift].some(a=>a.declared===barWeight&&a.result==='good')) return true;
+  return false;
+}
+
+// ── Socket ──────────────────────────────────────────────────────────────────
+socket.on('connect', ()=>{
+  document.getElementById('conn-badge').textContent='LIVE';
+  document.getElementById('conn-badge').className='conn-badge ok';
+  socket.emit('join', platformNum);
+});
+socket.on('disconnect', ()=>{
+  document.getElementById('conn-badge').textContent='OFFLINE';
+  document.getElementById('conn-badge').className='conn-badge off';
+});
+socket.on('state-update', (meetState)=>{
+  _meet = meetState;
+  _ps   = meetState.platformStates?.[platformNum] || { status: meetState.status, attemptRound:1, barWeight:null, checkedIn:[] };
+  render();
+});
+
+// ── Actions ──────────────────────────────────────────────────────────────────
+function setBarWeight(){
+  const w = parseInt(document.getElementById('bar-input').value);
+  if(!w||w<45){ alert('Enter a valid weight (45 lbs minimum).'); return; }
+  socket.emit('set-bar-weight',{ pNum:platformNum, weight:w });
+}
+function advanceRound(){
+  socket.emit('advance-attempt-round',{ pNum:platformNum });
+}
+let _breakDuration = 0;
+
+function selectDuration(seconds){
+  _breakDuration = seconds;
+  document.querySelectorAll('.bdur-btn').forEach(b=>{ b.style.borderColor=''; b.style.color=''; });
+  const btn = document.getElementById('bdur-'+seconds);
+  if(btn){ btn.style.borderColor='var(--gold)'; btn.style.color='var(--gold)'; }
+  document.getElementById('bdur-custom').value='';
+}
+function selectCustomDuration(val){
+  const secs = parseInt(val)*60;
+  if(!isNaN(secs)&&secs>0){
+    _breakDuration = secs;
+    document.querySelectorAll('.bdur-btn').forEach(b=>{ b.style.borderColor=''; b.style.color=''; });
+  }
+}
+function advancePhase(){
+  if(!confirm('Advance to the next phase? This cannot be undone.')) return;
+  socket.emit('advance-phase',{ pNum:platformNum, breakDuration:_breakDuration });
+  _breakDuration = 0;
+  selectDuration(0);
+}
+function pauseBreak()  { socket.emit('pause-break',  { pNum:platformNum }); }
+function resumeBreak() { socket.emit('resume-break', { pNum:platformNum }); }
+function resetBreak()  { socket.emit('reset-break',  { pNum:platformNum }); }
+function checkIn(entryId, attemptIdx){
+  socket.emit('check-in',{ pNum:platformNum, entryId, attemptIdx });
+}
+function passAttempt(entryId){
+  const e = _meet.entries.find(x=>x.id===entryId);
+  if(!e) return;
+  const lift = _ps.status;
+  const idx  = _curIdx(e,lift);
+  if(idx < 0) return;
+  const minW = (_ps.barWeight || e[lift][idx].declared) + 5;
+  const ord  = ORDINALS[idx]||(idx+1)+'th';
+  _pending = { entryId, lift, nextIdx:idx, minW, name:e.name, ordinal:ord, isPass:true };
+  document.getElementById('modal-title').textContent = 'Pass — Declare New Weight';
+  document.getElementById('modal-sub').textContent   = `${e.name} — ${ord} attempt. New minimum: ${minW} lbs`;
+  document.getElementById('modal-skip-btn').textContent = 'Cancel';
+  document.getElementById('modal-scratch-btn').style.display = 'none';
+  const inp = document.getElementById('modal-weight');
+  inp.min   = minW;
+  inp.value = minW;
+  document.getElementById('modal-overlay').style.display='flex';
+  setTimeout(()=>{ inp.focus(); inp.select(); },50);
+}
+function scratchEntry(entryId){
+  if(!confirm('Scratch this lifter from the remainder of this phase?')) return;
+  socket.emit('scratch-entry',{ pNum:platformNum, entryId, lift:_ps.status });
+}
+function uncheckIn(entryId, attemptIdx){
+  socket.emit('uncheck-in',{ pNum:platformNum, entryId, attemptIdx });
+}
+function declareWaiting(entryId, attemptIdx){
+  const e = _meet.entries.find(x=>x.id===entryId);
+  if(!e) return;
+  const lift = _ps.status;
+  const att  = e[lift][attemptIdx];
+  if(!att||att.result!==null) return;
+  const minW = _minDeclare(e,lift,attemptIdx);
+  _pending = { entryId, lift, nextIdx:attemptIdx, minW, name:e.name,
+               ordinal:(['1st','2nd','3rd'][attemptIdx]||(attemptIdx+1)+'th') };
+  document.getElementById('modal-title').textContent='Change Declared Weight';
+  document.getElementById('modal-sub').textContent=`${e.name} — ${_pending.ordinal} attempt (min ${minW} lbs)`;
+  document.getElementById('modal-skip-btn').textContent = 'Cancel';
+  document.getElementById('modal-scratch-btn').style.display = '';
+  const inp=document.getElementById('modal-weight');
+  inp.min=minW; inp.value=att.declared||minW;
+  document.getElementById('modal-overlay').style.display='flex';
+  setTimeout(()=>{ inp.focus(); inp.select(); },50);
+}
+function recordResult(result){
+  if(_currentId===null||_currentIdx===null) return;
+  const lift = _ps.status;
+  socket.emit('record-result',{ pNum:platformNum, entryId:_currentId, lift, attemptIdx:_currentIdx, result });
+  // Offer declare modal for next attempt
+  const e = _meet.entries.find(x=>x.id===_currentId);
+  if(e && _currentIdx<2 && e[lift][_currentIdx+1]?.result===null){
+    const minW = result==='good' ? e[lift][_currentIdx].declared+5 : e[lift][_currentIdx].declared;
+    _pending = { entryId:_currentId, lift, nextIdx:_currentIdx+1, minW,
+                 name: e.name, ordinal: ORDINALS[_currentIdx+1]||(_currentIdx+2)+'th' };
+    openModal();
+  }
+}
+function openModal(){
+  if(!_pending) return;
+  document.getElementById('modal-title').textContent = `Declare ${_pending.ordinal} Attempt`;
+  document.getElementById('modal-sub').textContent   = `${_pending.name} — minimum ${_pending.minW} lbs`;
+  document.getElementById('modal-skip-btn').textContent = 'Skip';
+  document.getElementById('modal-scratch-btn').style.display = _pending.isPass ? 'none' : '';
+  const inp = document.getElementById('modal-weight');
+  inp.min   = _pending.minW;
+  inp.value = _pending.minW;
+  document.getElementById('modal-overlay').style.display='flex';
+  setTimeout(()=>{ inp.focus(); inp.select(); },50);
+}
+function closeModal(){
+  document.getElementById('modal-overlay').style.display='none';
+  _pending = null;
+}
+function scratchFromModal(){
+  if(!_pending) return;
+  const { entryId, lift, name } = _pending;
+  closeModal();
+  if(!confirm(`Scratch ${name} from the remainder of ${STATUS_LABEL[lift]||lift}?`)) return;
+  socket.emit('scratch-entry',{ pNum:platformNum, entryId, lift });
+}
+function overrideCheckIn(entryId, idx, reason){
+  const e = _meet.entries.find(x=>x.id===entryId);
+  if(!e) return;
+  if(!confirm(`Override check-in for ${e.name}?\n(${reason})\nThis athlete normally cannot check in at this bar weight.`)) return;
+  socket.emit('check-in',{ pNum:platformNum, entryId, attemptIdx:idx });
+}
+function confirmDeclare(){
+  if(!_pending) return;
+  const w = parseInt(document.getElementById('modal-weight').value)||0;
+  if(w < _pending.minW){ alert(`Minimum weight is ${_pending.minW} lbs.`); return; }
+  if(_pending.isPass){
+    socket.emit('pass-attempt',{ pNum:platformNum, entryId:_pending.entryId, lift:_pending.lift, weight:w });
+  } else {
+    socket.emit('declare-attempt',{ entryId:_pending.entryId, lift:_pending.lift, attemptIdx:_pending.nextIdx, weight:w });
+  }
+  closeModal();
+}
+document.getElementById('modal-weight').addEventListener('keydown', e=>{ if(e.key==='Enter') confirmDeclare(); });
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render(){
+  if(!_meet) return;
+  const m   = _meet;
+  const ps  = _ps;
+  const lift = ps.status || m.status;
+  const ar   = ps.attemptRound || 1;  // director-unlocked attempt tier (1, 2, or 3)
+  const bw   = ps.barWeight    || null;
+  const ciSet = new Set(ps.checkedIn || []);
+
+  // Header
+  document.getElementById('hdr-platform').textContent = 'Platform ' + platformNum;
+  document.getElementById('hdr-meet').textContent     = m.name || 'LiftBuilder';
+  document.getElementById('hdr-phase').textContent    = STATUS_LABEL[lift] || lift;
+  const barBadge = document.getElementById('hdr-bar');
+  if(bw){ barBadge.style.display='block'; barBadge.textContent='BAR: '+bw+' lbs'; }
+  else   { barBadge.style.display='none'; }
+
+  // Round badge + advance button (matches single-platform bar control)
+  document.getElementById('round-badge').textContent = (ORDINALS[ar-1]||ar+'th')+' Attempt';
+  document.getElementById('round-badge').style.display='';
+  const nrBtn = document.getElementById('next-round-btn');
+  if(ar<3){ nrBtn.style.display=''; nrBtn.textContent='→ '+(ORDINALS[ar]||'Next')+' Attempt'; }
+  else     { nrBtn.style.display='none'; }
+
+  // Filter entries to this platform
+  const pEntries = m.entries.filter(e=>e.platform===platformNum);
+
+  if(!pEntries.length){
+    document.getElementById('main').style.display='none';
+    document.getElementById('no-data').style.display='flex';
+    return;
+  }
+  document.getElementById('main').style.display='';
+  document.getElementById('no-data').style.display='none';
+
+  const elig      = pEntries.filter(e=>_eligibleForLift(e,lift)&&_curIdx(e,lift)>=0);
+  const checkedIn = elig.filter(e=>ciSet.has(e.id+':'+_curIdx(e,lift)));
+  const waiting   = elig
+    .filter(e=>!ciSet.has(e.id+':'+_curIdx(e,lift)))
+    .sort((a,b)=>{
+      const idxA=_curIdx(a,lift); const idxB=_curIdx(b,lift);
+      const canA=bw&&idxA===ar-1&&!_checkInBlocked(a,lift,bw)?0:1;
+      const canB=bw&&idxB===ar-1&&!_checkInBlocked(b,lift,bw)?0:1;
+      return canA-canB;
+    });
+  const done      = pEntries.filter(e=>_eligibleForLift(e,lift)&&_curIdx(e,lift)<0);
+  const current   = checkedIn[0]||null;
+  const onDeck    = checkedIn.slice(1);
+
+  // Suggested next weight button (needs checkedIn to be defined first)
+  const nextWrap = document.getElementById('next-weight-wrap');
+  const nextWBtn = document.getElementById('next-weight-btn');
+  if(bw && checkedIn.length===0){
+    const nextW = bw + 5;
+    nextWBtn.textContent = 'Load '+nextW+' lbs →';
+    nextWBtn.onclick = ()=>{ document.getElementById('bar-input').value=nextW; setBarWeight(); };
+    nextWrap.style.display='flex';
+  } else {
+    nextWrap.style.display='none';
+  }
+
+  const phaseComplete = pEntries.filter(e=>_eligibleForLift(e,lift)).every(e=>e[lift].every(a=>a.result!==null));
+
+  // Break timer card
+  const hasBreak  = !!(ps.breakEndMs || ps.breakPausedRem != null);
+  const breakCard = document.getElementById('break-card');
+  if(hasBreak && lift!=='complete'){
+    breakCard.style.display='';
+    const nextLabel = lift==='snatch'?'Clean & Jerk':(lift==='cj'?'Bench':'Complete');
+    document.getElementById('break-phase-label').textContent='Next: '+nextLabel;
+  } else {
+    breakCard.style.display='none';
+  }
+
+  // Phase done banner
+  const pdDiv = document.getElementById('phase-done');
+  const pdTxt = document.getElementById('phase-done-text');
+  if(lift==='complete'){
+    pdDiv.style.display='block'; pdTxt.textContent='Platform Complete 🏆';
+    document.getElementById('phase-advance-btn').style.display='none';
+    document.getElementById('break-picker').style.display='none';
+  } else if(phaseComplete){
+    pdDiv.style.display='block'; pdTxt.textContent=(STATUS_LABEL[lift]||lift)+' phase complete';
+    document.getElementById('phase-advance-btn').style.display='block';
+    document.getElementById('break-picker').style.display='flex';
+    const nextLabel = lift==='snatch'?'Clean & Jerk':(lift==='cj'?'Bench / Complete':'Complete Meet');
+    document.getElementById('phase-advance-btn').textContent='Advance to '+nextLabel+' →';
+  } else {
+    pdDiv.style.display='none';
+  }
+
+  // NOW LIFTING
+  const nowCard    = document.getElementById('now-card');
+  const waitingMsg = document.getElementById('waiting-msg');
+  if(current){
+    nowCard.style.borderColor='var(--gold)';
+    nowCard.style.display='';
+    document.getElementById('now-label').textContent='NOW LIFTING';
+    document.getElementById('now-label').style.color='var(--gold)';
+    document.getElementById('now-result').style.display='none';
+    document.getElementById('now-actions').style.display='';
+    // Clock visibility + controls handled by 200ms interval; force hide if no clock data
+    if(!ps.clockStart && ps.clockPausedRemaining == null) {
+      document.getElementById('now-clock').style.display='none';
+      document.getElementById('now-clock-controls').style.display='none';
+    }
+    const idx   = _curIdx(current,lift);
+    const att   = current[lift][idx];
+    const sch   = m.schools.find(s=>s.id===current.schoolId);
+    const ord   = ORDINALS[idx]||(idx+1)+'th';
+    document.getElementById('now-name').textContent    = current.name;
+    document.getElementById('now-meta').textContent    = (sch?.name||'')+ ' · '+current.wc+' lbs';
+    document.getElementById('now-weight').innerHTML    = att.declared+' <span>lbs</span>';
+    document.getElementById('now-ordinal').textContent = ord+' attempt — '+(STATUS_LABEL[lift]||lift);
+    document.getElementById('now-dots').innerHTML      = _dots(current[lift],idx);
+    _currentId  = current.id;
+    _currentIdx = idx;
+    waitingMsg.style.display='none';
+  } else if(m.lastLift && m.lastLift.platform === platformNum && !phaseComplete){
+    const ll = m.lastLift;
+    nowCard.style.display='';
+    nowCard.style.borderColor='#444';
+    document.getElementById('now-label').textContent='PREVIOUS LIFT';
+    document.getElementById('now-label').style.color='#666';
+    document.getElementById('now-actions').style.display='none';
+    document.getElementById('now-result').style.display='';
+    const prevEnt = m.entries.find(e=>e.id===ll.entryId);
+    const prevSch = m.schools.find(s=>s.id===ll.schoolId);
+    document.getElementById('now-name').textContent    = ll.name;
+    document.getElementById('now-meta').textContent    = (prevSch?.name||'')+' · '+ll.wc+' lbs';
+    document.getElementById('now-weight').innerHTML    = ll.declared+' <span>lbs</span>';
+    document.getElementById('now-ordinal').textContent = STATUS_LABEL[ll.lift]||ll.lift;
+    document.getElementById('now-dots').innerHTML      = prevEnt?_dots(prevEnt[ll.lift],-1):'';
+    document.getElementById('now-result').innerHTML    = ll.result==='good'
+      ? '<div style="display:inline-block;background:rgba(30,100,50,.35);border:2px solid var(--green);border-radius:8px;padding:12px 24px;font-size:28px;font-weight:900;color:var(--green);letter-spacing:2px;">✓ GOOD LIFT</div>'
+      : '<div style="display:inline-block;background:rgba(100,20,20,.35);border:2px solid var(--red);border-radius:8px;padding:12px 24px;font-size:28px;font-weight:900;color:var(--red);letter-spacing:2px;">✗ NO LIFT</div>';
+    _currentId  = null; _currentIdx = null;
+    waitingMsg.style.display= hasBreak ? 'none' : 'block';
+    waitingMsg.textContent = bw ? 'Bar loaded at '+bw+' lbs — waiting for check-in…' : 'Waiting for next athlete to check in…';
+  } else {
+    nowCard.style.display='none';
+    _currentId=null; _currentIdx=null;
+    if(!phaseComplete && !hasBreak){
+      waitingMsg.style.display='block';
+      waitingMsg.textContent = bw ? 'Bar loaded at '+bw+' lbs — waiting for check-in…' : 'Set bar weight to begin.';
+    } else {
+      waitingMsg.style.display='none';
+    }
+  }
+
+  // ON DECK
+  const deckCard = document.getElementById('deck-card');
+  if(onDeck.length){
+    deckCard.style.display='';
+    document.querySelector('#deck-table tbody').innerHTML = onDeck.map((e,qi)=>{
+      const idx = _curIdx(e,lift); const att=e[lift][idx];
+      const sch = m.schools.find(s=>s.id===e.schoolId);
+      return `<tr>
+        <td class="td-p muted" style="width:30px;font-size:12px;text-align:center;">${qi+2}</td>
+        <td class="td-p"><div class="name-lg">${esc(e.name)}</div><div class="name-sm">${esc(sch?.name||'')} · ${e.wc}</div></td>
+        <td class="td-p">${_dots(e[lift],idx)}</td>
+        <td class="td-r"><span class="wt-lg">${att.declared||'—'}</span> <span class="muted" style="font-size:11px;">lbs</span></td>
+        <td class="td-p" style="white-space:nowrap;">
+          <button onclick="uncheckIn('${e.id}',${idx})" style="background:none;border:1px solid #5EC08A;border-radius:3px;cursor:pointer;color:#5EC08A;font-size:10px;padding:2px 7px;font-family:'Barlow Condensed',Arial,sans-serif;font-weight:600;margin-right:3px;">UNCHECK</button>
+          <button onclick="passAttempt('${e.id}')" style="background:none;border:1px solid var(--gold);border-radius:3px;cursor:pointer;color:var(--gold);font-size:10px;padding:2px 7px;font-family:'Barlow Condensed',Arial,sans-serif;font-weight:600;margin-right:3px;">PASS</button>
+          <button onclick="scratchEntry('${e.id}')" style="background:none;border:none;cursor:pointer;color:#555;font-size:10px;padding:2px 4px;font-family:'Barlow Condensed',Arial,sans-serif;font-weight:600;">SCRATCH</button>
+        </td>
+      </tr>`;
+    }).join('');
+  } else { deckCard.style.display='none'; }
+
+  // WAITING
+  const waitCard = document.getElementById('wait-card');
+  if(waiting.length){
+    waitCard.style.display='';
+    let passedDiv = false;
+    document.querySelector('#wait-table tbody').innerHTML = waiting.map(e=>{
+      const idx = _curIdx(e,lift); const att=e[lift][idx];
+      const sch = m.schools.find(s=>s.id===e.schoolId);
+      const canCI = bw && idx===ar-1 && !_checkInBlocked(e,lift,bw);
+      const isBlocked = bw && !canCI && _checkInBlocked(e,lift,bw);
+      let blockReason = '';
+      if(isBlocked){
+        const prevDone = e[lift].filter(a=>a.result!==null);
+        const hi = prevDone.length ? Math.max(...prevDone.map(a=>a.declared)) : 0;
+        blockReason = bw < hi ? `LIFTED ${hi}` : 'MADE THIS WT';
+      }
+      let divider = '';
+      if(!canCI && !passedDiv && waiting.some(x=>{
+        const xi=_curIdx(x,lift); return bw&&xi===ar-1&&!_checkInBlocked(x,lift,bw);
+      })){ passedDiv=true; divider='<tr><td colspan="5" style="padding:0;border-top:1px dashed var(--dark3);"></td></tr>'; }
+      const op = canCI?'1':'0.5';
+      return divider+`<tr style="opacity:${op};">
+        <td class="td-p"><div class="name-lg" style="font-weight:${canCI?700:500};">${esc(e.name)}</div><div class="name-sm">${esc(sch?.name||'')} · ${e.wc}</div></td>
+        <td class="td-p">${_dots(e[lift],idx)}</td>
+        <td class="td-r"><span class="wt-lg">${att.declared||'—'}</span> <span class="muted" style="font-size:11px;">lbs</span></td>
+        <td class="td-p" style="white-space:nowrap;">
+          ${isBlocked ? `<span style="font-size:10px;color:var(--muted);letter-spacing:.5px;margin-right:4px;">${blockReason}</span>` : ''}
+          <button onclick="declareWaiting('${e.id}',${idx})" style="background:none;border:1px solid #444;border-radius:3px;cursor:pointer;color:#888;font-size:10px;padding:2px 7px;font-family:'Barlow Condensed',Arial,sans-serif;font-weight:600;margin-right:3px;">DECLARE</button>
+          ${canCI
+            ? `<button onclick="checkIn('${e.id}',${idx})" style="background:none;border:1px solid var(--green);border-radius:3px;cursor:pointer;color:var(--green);font-size:11px;padding:3px 10px;font-family:'Barlow Condensed',Arial,sans-serif;font-weight:700;">CHECK IN</button>`
+            : bw ? `<button onclick="overrideCheckIn('${e.id}',${idx},'${blockReason||'Wrong round'}')" style="background:none;border:1px solid #666;border-radius:3px;cursor:pointer;color:#666;font-size:10px;padding:2px 7px;font-family:'Barlow Condensed',Arial,sans-serif;font-weight:600;">OVERRIDE</button>` : ''
+          }
+          <button onclick="scratchEntry('${e.id}')" style="background:none;border:none;cursor:pointer;color:#555;font-size:10px;padding:2px 4px;font-family:'Barlow Condensed',Arial,sans-serif;font-weight:600;margin-left:3px;">SCRATCH</button>
+        </td>
+      </tr>`;
+    }).join('');
+  } else { waitCard.style.display='none'; }
+
+  // COMPLETED
+  const doneCard = document.getElementById('done-card');
+  if(done.length){
+    doneCard.style.display='';
+    document.getElementById('done-label').textContent = 'COMPLETED — '+(STATUS_LABEL[lift]||lift).toUpperCase();
+    document.querySelector('#done-table tbody').innerHTML = done.map(e=>{
+      const best=_bestMade(e[lift]); const sch=m.schools.find(s=>s.id===e.schoolId);
+      return `<tr>
+        <td class="td-p"><div class="name-lg">${esc(e.name)}</div><div class="name-sm">${esc(sch?.name||'')} · ${e.wc}</div></td>
+        <td class="td-p">${_dots(e[lift],-1)}</td>
+        <td class="td-r" style="font-family:'Barlow Condensed',Arial,sans-serif;font-size:16px;font-weight:700;color:${best?'var(--gold)':'var(--red)'};">${best?best+' lbs':'Bomb'}</td>
+      </tr>`;
+    }).join('');
+  } else { doneCard.style.display='none'; }
+
+  // Scoreboard
+  const wcs   = m.gender==='Girls'?GIRLS_WC:BOYS_WC;
+  const pWcs  = [...new Set(pEntries.map(e=>e.wc))];
+  const oElig = m.entries.filter(e=>e.discipline==='both'||e.discipline==='olympic');
+  const tElig = m.entries.filter(e=>e.discipline==='both'||e.discipline==='traditional');
+
+  function sbSection(label,elig,totFn){
+    const wcGroup = wcs.filter(wc=>pWcs.includes(wc)&&elig.some(e=>e.wc===wc));
+    if(!wcGroup.length) return '';
+    let html=`<div class="sb-label" style="margin:10px 0 6px;">${label}</div>`;
+    html+=wcGroup.map(wc=>{
+      const grp=elig.filter(e=>e.wc===wc).map(e=>({e,tot:totFn(e)})).sort(_rankCmp);
+      let p=0;
+      return `<div style="margin-bottom:14px;"><div class="wc-hd">${wc} LBS</div>`+
+        grp.map(r=>{
+          if(r.tot>0) p++;
+          const medal=p===1?'🥇':p===2?'🥈':p===3?'🥉':null;
+          const pl=r.tot>0?(medal||p):'—';
+          const sch=m.schools.find(s=>s.id===r.e.schoolId);
+          return `<div class="sr${r.tot>0&&p===1?' first':''}">
+            <div class="sr-pl${r.tot>0&&p<=3?' gold':''}" style="font-size:${medal?'18px':'16px'}">${pl}</div>
+            <div><div class="sr-name">${esc(r.e.name)}</div><div class="sr-sch">${esc(sch?.name||'')}</div></div>
+            <div class="sr-tot${!r.tot?' bomb':''}">${r.tot||'0'}</div>
+          </div>`;
+        }).join('')+'</div>';
+    }).join('');
+    return html;
+  }
+
+  document.getElementById('scoreboard').innerHTML =
+    sbSection('OLYMPIC',oElig,_olympicTotal)+sbSection('TRADITIONAL',tElig,_traditionalTotal);
+
+  // Team scores
+  const N  = (m.schools||[]).length;
+  const pts = _teamPoints(N);
+  const sc  = {};
+  (m.schools||[]).forEach(s=>{ sc[s.id]={name:s.name,olympic:0,traditional:0}; });
+  wcs.filter(wc=>oElig.some(e=>e.wc===wc)).forEach(wc=>{
+    const grp=oElig.filter(e=>e.wc===wc).map(e=>({e,tot:_olympicTotal(e)})).sort(_rankCmp);
+    let p=0; grp.forEach(r=>{ if(r.tot>0&&sc[r.e.schoolId]&&p<pts.length) sc[r.e.schoolId].olympic+=pts[p++]; });
+  });
+  wcs.filter(wc=>tElig.some(e=>e.wc===wc)).forEach(wc=>{
+    const grp=tElig.filter(e=>e.wc===wc).map(e=>({e,tot:_traditionalTotal(e)})).sort(_rankCmp);
+    let p=0; grp.forEach(r=>{ if(r.tot>0&&sc[r.e.schoolId]&&p<pts.length) sc[r.e.schoolId].traditional+=pts[p++]; });
+  });
+  const sorted=Object.values(sc).map(s=>({...s,total:s.olympic+s.traditional})).sort((a,b)=>b.total-a.total);
+  document.getElementById('team-scores').innerHTML=sorted.map((s,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:5px;margin-bottom:5px;${i===0?'background:var(--gold-a15);':''}">
+      <div style="font-size:18px;font-weight:700;width:26px;color:${i===0?'var(--gold)':'#555'}">${i+1}</div>
+      <div style="flex:1;font-size:16px;font-weight:600;">${esc(s.name)}</div>
+      <div style="font-size:24px;font-weight:700;color:var(--gold);">${s.total}</div>
+    </div>`).join('');
+}
+
+// ── Bar input enter key ──────────────────────────────────────────────────────
+document.getElementById('bar-input').addEventListener('keydown', e=>{
+  if(e.key==='Enter') setBarWeight();
+});
+
+// ── Break timer display in header ────────────────────────────────────────────
+setInterval(()=>{
+  const el = document.getElementById('hdr-timer');
+  if(!el) return;
+  const endMs  = _meet?.timerEndMs;
+  const paused = _meet?.timerPausedRem;
+  if(paused != null) {
+    const rem  = Math.max(0, paused);
+    const mins = Math.floor(rem / 60000);
+    const secs = Math.floor((rem % 60000) / 1000);
+    el.textContent   = '⏱ ' + mins + ':' + String(secs).padStart(2,'0');
+    el.style.display = '';
+    el.style.color   = rem < 10000 ? 'var(--red)' : rem < 30000 ? '#E0A040' : 'var(--gold)';
+    el.style.opacity = '0.6';
+  } else if(endMs) {
+    const rem  = Math.max(0, endMs - Date.now());
+    const mins = Math.floor(rem / 60000);
+    const secs = Math.floor((rem % 60000) / 1000);
+    el.textContent   = '⏱ ' + mins + ':' + String(secs).padStart(2,'0');
+    el.style.display = '';
+    el.style.color   = rem < 10000 ? 'var(--red)' : rem < 30000 ? '#E0A040' : 'var(--gold)';
+    el.style.opacity = '1';
+  } else {
+    el.style.display = 'none';
+  }
+}, 250);
+
+// ── Countdown clock ──────────────────────────────────────────────────────────
+setInterval(()=>{
+  const el       = document.getElementById('now-clock');
+  const controls = document.getElementById('now-clock-controls');
+  const btnPause  = document.getElementById('btn-clock-pause');
+  const btnResume = document.getElementById('btn-clock-resume');
+  if(!el) return;
+  const paused   = _ps?.clockPausedRemaining;
+  const start    = _ps?.clockStart;
+  const duration = _ps?.clockDuration;
+  if(paused != null) {
+    const rem  = Math.max(0, paused);
+    const mins = Math.floor(rem / 60000);
+    const secs = Math.floor((rem % 60000) / 1000);
+    el.textContent   = mins + ':' + String(secs).padStart(2,'0');
+    el.style.display = 'block';
+    el.style.color   = rem <= 10000 ? 'var(--red)' : rem <= 30000 ? '#E0A040' : 'var(--green)';
+    el.style.opacity = '0.6';
+    if(controls){ controls.style.display='flex'; }
+    if(btnPause)  btnPause.style.display  = 'none';
+    if(btnResume) btnResume.style.display = 'block';
+  } else if(start && duration) {
+    const rem  = Math.max(0, duration * 1000 - (Date.now() - start));
+    const mins = Math.floor(rem / 60000);
+    const secs = Math.floor((rem % 60000) / 1000);
+    el.textContent   = mins + ':' + String(secs).padStart(2,'0');
+    el.style.display = 'block';
+    el.style.color   = rem <= 10000 ? 'var(--red)' : rem <= 30000 ? '#E0A040' : 'var(--green)';
+    el.style.opacity = '1';
+    if(controls){ controls.style.display='flex'; }
+    if(btnPause)  btnPause.style.display  = 'block';
+    if(btnResume) btnResume.style.display = 'none';
+  } else {
+    el.style.display = 'none';
+    if(controls) controls.style.display='none';
+  }
+}, 200);
+
+function pauseClock()  { socket.emit('pause-clock',  { pNum: platformNum }); }
+function resumeClock() { socket.emit('resume-clock', { pNum: platformNum }); }
+function resetClock()  { socket.emit('reset-clock',  { pNum: platformNum }); }
+
+// ── Break timer countdown ─────────────────────────────────────────────────────
+setInterval(()=>{
+  const el        = document.getElementById('break-clock');
+  const btnPause  = document.getElementById('btn-break-pause');
+  const btnResume = document.getElementById('btn-break-resume');
+  if(!el || !_ps) return;
+  const paused = _ps.breakPausedRem;
+  const endMs  = _ps.breakEndMs;
+  if(paused != null){
+    const rem  = Math.max(0, paused);
+    const mins = Math.floor(rem / 60000);
+    const secs = Math.floor((rem % 60000) / 1000);
+    el.textContent   = mins + ':' + String(secs).padStart(2,'0');
+    el.style.color   = rem <= 30000 ? 'var(--red)' : rem <= 60000 ? '#E0A040' : 'var(--green)';
+    el.style.opacity = '0.6';
+    if(btnPause)  btnPause.style.display  = 'none';
+    if(btnResume) btnResume.style.display = '';
+  } else if(endMs){
+    const rem  = Math.max(0, endMs - Date.now());
+    const mins = Math.floor(rem / 60000);
+    const secs = Math.floor((rem % 60000) / 1000);
+    el.textContent   = mins + ':' + String(secs).padStart(2,'0');
+    el.style.color   = rem <= 30000 ? 'var(--red)' : rem <= 60000 ? '#E0A040' : 'var(--green)';
+    el.style.opacity = '1';
+    if(btnPause)  btnPause.style.display  = '';
+    if(btnResume) btnResume.style.display = 'none';
+  }
+}, 250);
+</script>
+</body>
+</html>
