@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-src 'none'; base-uri 'self'; connect-src 'self' ws: wss:;">
+<title>LiftBuilder — Platform Display</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0E0E0E;
+    color: #F0F4F8;
+    font-family: Arial, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+  #header {
+    background: #161616;
+    border-bottom: 2px solid #C9A84C;
+    padding: 12px 32px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  #platform-label { font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #C9A84C; }
+  #meet-name      { font-size: 24px; font-weight: 700; letter-spacing: 1px; flex: 1; }
+  #phase-badge    {
+    font-size: 14px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    padding: 4px 14px; border-radius: 4px; background: rgba(201,168,76,.2); color: #C9A84C;
+  }
+  #bar-badge {
+    display: none;
+    font-size: 13px; font-weight: 700; padding: 4px 14px; border-radius: 4px;
+    background: rgba(94,192,138,.15); color: #5EC08A; letter-spacing: .5px;
+  }
+  #conn-badge {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px; padding: 2px 10px; border-radius: 4px;
+  }
+  #conn-badge.ok  { background: rgba(94,192,138,.15); color: #5EC08A; }
+  #conn-badge.off { background: rgba(224,112,112,.15); color: #E07070; }
+
+  #main {
+    display: grid;
+    grid-template-columns: 5fr 3fr;
+    height: 100%;
+    overflow: hidden;
+  }
+  #left  { padding: 28px 32px; display: flex; flex-direction: column; gap: 20px; overflow: hidden; }
+  #right { background: #141414; border-left: 1px solid #222; padding: 20px 24px; overflow-y: auto; }
+
+  /* NOW LIFTING */
+  #now-lifting {
+    background: #1a1a1a; border: 2px solid #C9A84C; border-radius: 10px;
+    padding: 24px 32px; flex-shrink: 0;
+    display: none;
+  }
+  #now-label   { font-size: 12px; font-weight: 700; letter-spacing: 2px; color: #C9A84C; margin-bottom: 10px; }
+  #now-name    { font-size: 52px; font-weight: 700; line-height: 1; }
+  #now-meta    { font-size: 18px; color: #888; margin-top: 6px; }
+  #now-weight  { font-size: 72px; font-weight: 700; color: #C9A84C; line-height: 1; margin-top: 12px; }
+  #now-weight span { font-size: 28px; color: #666; }
+  #now-attempt { font-size: 16px; color: #888; margin-top: 4px; }
+  #now-dots    { font-size: 22px; margin-top: 8px; }
+  #now-clock   { font-size: 80px; font-weight: 700; color: #5EC08A; margin-top: 10px; letter-spacing: 2px; display: none; }
+  #now-result  { display: none; margin-top: 18px; }
+  .result-badge {
+    display: inline-block; border-radius: 8px; padding: 14px 28px;
+    font-size: 34px; font-weight: 900; letter-spacing: 2px;
+  }
+  .result-badge.good { background: rgba(30,100,50,.35); border: 2px solid #5EC08A; color: #5EC08A; }
+  .result-badge.miss { background: rgba(100,20,20,.35); border: 2px solid #E07070; color: #E07070; }
+
+  /* Result flash overlay */
+  #result-flash {
+    position: fixed; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    font-size: 120px; font-weight: 900; letter-spacing: 4px;
+    z-index: 100; pointer-events: none;
+  }
+
+  /* Waiting */
+  #waiting-msg {
+    display: none;
+    background: #1a1a1a; border: 1px solid #333; border-radius: 10px;
+    padding: 32px; text-align: center;
+  }
+  #waiting-text { font-size: 22px; color: #555; }
+
+  /* Break timer */
+  #break-card {
+    display: none;
+    background: #1a1a1a; border: 2px solid #C9A84C; border-radius: 10px;
+    padding: 28px 32px; text-align: center; flex-shrink: 0;
+  }
+  #break-label     { font-size: 13px; font-weight: 700; letter-spacing: 3px; color: #C9A84C; margin-bottom: 8px; }
+  #break-phase     { font-size: 20px; font-weight: 700; color: #F0F4F8; margin-bottom: 12px; }
+  #break-countdown {
+    font-family: 'Barlow Condensed', Arial, sans-serif;
+    font-size: 110px; font-weight: 700; color: #C9A84C; line-height: 1; letter-spacing: 4px;
+  }
+
+  /* ON DECK */
+  #queue-label { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #555; margin-bottom: 8px; }
+  #queue       { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 8px; }
+  .q-row {
+    background: #1a1a1a; border-radius: 6px; padding: 12px 20px;
+    display: flex; align-items: center; gap: 16px; border: 1px solid #222;
+  }
+  .q-num    { font-size: 20px; font-weight: 700; color: #444; width: 28px; flex-shrink: 0; }
+  .q-name   { font-size: 20px; font-weight: 600; flex: 1; }
+  .q-meta   { font-size: 13px; color: #666; }
+  .q-weight { font-size: 26px; font-weight: 700; color: #C9A84C; white-space: nowrap; }
+  .q-dots   { font-size: 14px; }
+
+  /* Phase complete */
+  #phase-done {
+    display: none;
+    background: #1a1a1a; border: 2px solid #5EC08A; border-radius: 10px;
+    padding: 32px; text-align: center;
+  }
+  #phase-done-text { font-size: 28px; font-weight: 700; color: #5EC08A; }
+
+  /* Scoreboard */
+  #score-label   { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #555; margin-bottom: 12px; }
+  .wc-section    { margin-bottom: 20px; }
+  .wc-title      { font-size: 13px; font-weight: 700; color: #555; letter-spacing: 1px; background: #1c1c1c; padding: 4px 10px; border-radius: 3px; margin-bottom: 6px; }
+  .score-row     { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 5px; margin-bottom: 4px; }
+  .score-row.first { background: rgba(201,168,76,.08); }
+  .score-place   { font-size: 18px; font-weight: 700; width: 24px; flex-shrink: 0; color: #555; }
+  .score-place.gold { color: #C9A84C; }
+  .score-name    { flex: 1; font-size: 16px; font-weight: 600; }
+  .score-school  { font-size: 12px; color: #666; }
+  .score-total   { font-size: 22px; font-weight: 700; color: #C9A84C; }
+  .score-total.bomb { color: #E07070; font-size: 16px; }
+  .score-atts    { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+  .att-row       { display: flex; align-items: center; gap: 4px; }
+  .att-lbl       { font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #555; width: 18px; flex-shrink: 0; }
+  .att           { font-family: 'Barlow Condensed', Arial, sans-serif; font-size: 11px; font-weight: 700; min-width: 34px; text-align: center; padding: 1px 4px; border-radius: 3px; }
+  .att-good      { background: rgba(94,192,138,.2); color: #5EC08A; border: 1px solid rgba(94,192,138,.4); }
+  .att-miss      { background: rgba(224,112,112,.15); color: #E07070; border: 1px solid rgba(224,112,112,.35); text-decoration: line-through; }
+  .att-pending   { background: rgba(255,255,255,.06); color: #666; border: 1px solid #333; }
+  .att-empty     { color: #333; border: 1px solid #2a2a2a; background: transparent; }
+
+  #team-section  { margin-top: 24px; border-top: 1px solid #222; padding-top: 20px; }
+  .team-row      { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 6px; margin-bottom: 6px; }
+  .team-row.first { background: rgba(201,168,76,.1); }
+  .team-place    { font-size: 20px; font-weight: 700; width: 28px; }
+  .team-name     { flex: 1; font-size: 18px; font-weight: 600; }
+  .team-pts      { font-size: 28px; font-weight: 700; color: #C9A84C; }
+
+  /* Judge lights */
+  #judge-lights {
+    display: flex; gap: 10px; margin-top: 14px; justify-content: center;
+  }
+  .judge-light {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 2px solid #333; background: #222;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #555; transition: all .2s;
+  }
+  .judge-light.good { background: #1e5c35; border-color: #5EC08A; color: #5EC08A; }
+  .judge-light.no   { background: #5c1e1e; border-color: #E07070; color: #E07070; }
+
+  /* QR Code */
+  #qr-corner {
+    position: fixed; bottom: 16px; right: 16px;
+    background: #fff; border-radius: 6px; padding: 6px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.5);
+    z-index: 50;
+  }
+  #qr-corner canvas, #qr-corner img { display: block; width: 80px; height: 80px; }
+  #qr-label {
+    text-align: center; font-size: 9px; font-weight: 700;
+    color: #333; margin-top: 3px; letter-spacing: .5px;
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div id="platform-label">PLATFORM —</div>
+  <div id="meet-name">LiftBuilder</div>
+  <div id="phase-badge">—</div>
+  <div id="bar-badge"></div>
+  <div id="conn-badge" class="off">OFFLINE</div>
+</div>
+
+<div id="main">
+  <div id="left">
+    <div id="now-lifting">
+      <div id="now-label">NOW LIFTING</div>
+      <div id="now-name">—</div>
+      <div id="now-meta"></div>
+      <div id="now-weight">— <span>lbs</span></div>
+      <div id="now-attempt"></div>
+      <div id="now-dots"></div>
+      <div id="now-clock"></div>
+      <div id="now-result"></div>
+      <div id="judge-lights">
+        <div class="judge-light" id="jl-1" title="Judge 1">1</div>
+        <div class="judge-light" id="jl-2" title="Judge 2">2</div>
+        <div class="judge-light" id="jl-3" title="Judge 3">3</div>
+      </div>
+    </div>
+    <div id="waiting-msg"><div id="waiting-text">Waiting for athletes to check in…</div></div>
+    <div id="break-card">
+      <div id="break-label">BETWEEN PHASES</div>
+      <div id="break-phase"></div>
+      <div id="break-countdown">—</div>
+    </div>
+    <div id="queue-label" style="display:none;">ON DECK</div>
+    <div id="queue"></div>
+    <div id="phase-done"><div id="phase-done-text"></div></div>
+  </div>
+  <div id="right">
+    <div id="score-label">LIVE SCOREBOARD</div>
+    <div id="scoreboard"></div>
+    <div id="team-section">
+      <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:#555;margin-bottom:12px;">TEAM SCORES</div>
+      <div id="team-scores"></div>
+    </div>
+  </div>
+</div>
+
+<div id="result-flash"></div>
+
+<div id="qr-corner">
+  <div id="qr-img"></div>
+  <div id="qr-label">SCAN TO FOLLOW</div>
+</div>
+
+<script src="/vendor/qrcode.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+'use strict';
+
+const platformNum = parseInt(location.pathname.split('/').pop()) || 1;
+const _meetToken  = new URLSearchParams(location.search).get('pin') || '';
+const socket      = io({ auth: { token: _meetToken } });
+
+// ── QR code (generated once on load) ─────────────────────────────────────────
+(function() {
+  try {
+    const qr = qrcode(0, 'L');
+    qr.addData(location.href);
+    qr.make();
+    document.getElementById('qr-img').innerHTML = qr.createSvgTag({ scalable: true });
+    const svg = document.querySelector('#qr-img svg');
+    if (svg) { svg.style.width = '80px'; svg.style.height = '80px'; }
+  } catch(e) {
+    document.getElementById('qr-corner').style.display = 'none';
+  }
+})();
+
+const STATUS_LABEL = { snatch:'Snatch', cj:'Clean & Jerk', bench:'Bench', complete:'Complete' };
+const GIRLS_WC     = ['101','110','119','129','139','154','169','183','199','UNL'];
+const BOYS_WC      = ['119','129','139','154','169','183','199','219','238','HWT'];
+
+let _meet            = null;
+let _ps              = null;
+let _flashTimeout    = null;
+let _prevLastLiftKey = null;
+
+document.getElementById('platform-label').textContent = 'PLATFORM ' + platformNum + ' —';
+
+// ── Socket ───────────────────────────────────────────────────────────────────
+socket.on('connect', () => {
+  document.getElementById('conn-badge').textContent  = 'LIVE';
+  document.getElementById('conn-badge').className    = 'conn-badge ok';
+  socket.emit('join', platformNum);
+});
+socket.on('disconnect', () => {
+  document.getElementById('conn-badge').textContent = 'OFFLINE';
+  document.getElementById('conn-badge').className   = 'conn-badge off';
+});
+socket.on('state-update', (meetState) => {
+  _meet = meetState;
+  _ps   = meetState.platformStates?.[platformNum] || { status: meetState.status, attemptRound:1, barWeight:null, checkedIn:[] };
+  // Flash on new result for this platform
+  const ll    = meetState.lastLift;
+  const llKey = ll ? `${ll.entryId}:${ll.attemptIdx}:${ll.result}` : null;
+  if (llKey && llKey !== _prevLastLiftKey && ll.platform === platformNum) flashResult(ll.result);
+  _prevLastLiftKey = llKey;
+  render();
+});
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function esc(s)    { const d = document.createElement('div'); d.textContent = String(s||''); return d.innerHTML; }
+function _wcs(g)   { return g === 'Girls' ? GIRLS_WC : BOYS_WC; }
+function _curIdx(e, lift) { return e[lift].findIndex(a => a.result === null); }
+function _bestMade(atts)  { const w = atts.filter(a => a.result==='good').map(a => a.declared); return w.length ? Math.max(...w) : 0; }
+function _olympicTotal(e)     { const s=_bestMade(e.snatch), c=_bestMade(e.cj); return s>0&&c>0?s+c:0; }
+function _traditionalTotal(e) { const c=_bestMade(e.cj),    b=_bestMade(e.bench); return c>0&&b>0?c+b:0; }
+function _eligibleForLift(e, lift) {
+  if (lift==='snatch') return e.discipline==='both'||e.discipline==='olympic'||e.discipline==='exhibition';
+  if (lift==='cj')     return true;
+  if (lift==='bench')  return e.discipline==='both'||e.discipline==='traditional'||e.discipline==='exhibition';
+  return false;
+}
+function _teamPoints(N) {
+  if (N>=5) return [7,5,4,3,2,1];
+  if (N===4) return [6,4,3,2,1];
+  if (N===3) return [5,3,2,1];
+  return [5,3,1];
+}
+function _dots(attempts, curIdx) {
+  return attempts.map((a,i) => {
+    if (a.result==='good') return '<span style="color:#5EC08A;font-size:18px;">✓</span>';
+    if (a.result==='miss') return '<span style="color:#E07070;font-size:18px;">✗</span>';
+    if (i===curIdx)        return '<span style="color:#C9A84C;font-size:18px;">●</span>';
+    return '<span style="color:#333;font-size:18px;">○</span>';
+  }).join(' ');
+}
+
+function flashResult(result) {
+  const el = document.getElementById('result-flash');
+  if (_flashTimeout) clearTimeout(_flashTimeout);
+  el.textContent   = result==='good' ? '✓ GOOD LIFT' : '✗ NO LIFT';
+  el.style.background = result==='good' ? 'rgba(30,100,50,.92)' : 'rgba(100,20,20,.92)';
+  el.style.color   = result==='good' ? '#5EC08A' : '#E07070';
+  el.style.display = 'flex';
+  _flashTimeout = setTimeout(() => { el.style.display = 'none'; }, 2500);
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  if (!_meet || !_ps) return;
+  const m    = _meet;
+  const ps   = _ps;
+  const lift = ps.status || m.status;
+  const bw   = ps.barWeight || null;
+  const ciSet = new Set(ps.checkedIn || []);
+
+  // Header
+  document.getElementById('meet-name').textContent   = m.name || 'LiftBuilder';
+  document.getElementById('phase-badge').textContent = STATUS_LABEL[lift] || lift;
+  const barBadge = document.getElementById('bar-badge');
+  if (bw && lift !== 'complete') { barBadge.style.display = 'block'; barBadge.textContent = 'BAR: ' + bw + ' lbs'; }
+  else                           { barBadge.style.display = 'none'; }
+
+  // Platform entries only (for NOW LIFTING / ON DECK / phase complete)
+  const pEntries   = m.entries.filter(e => e.platform === platformNum);
+  const elig       = pEntries.filter(e => _eligibleForLift(e, lift) && _curIdx(e, lift) >= 0);
+  const checkedIn  = elig.filter(e => ciSet.has(e.id + ':' + _curIdx(e, lift)));
+  const current    = checkedIn[0] || null;
+  const onDeck     = checkedIn.slice(1, 5);
+  const phaseComplete = pEntries.filter(e => _eligibleForLift(e, lift)).every(e => e[lift].every(a => a.result !== null));
+  const hasBreak   = !!(ps.breakEndMs || ps.breakPausedRem != null);
+
+  // Break timer card
+  const breakCard = document.getElementById('break-card');
+  if (hasBreak && lift !== 'complete') {
+    const nextLabel = lift==='snatch' ? 'Clean & Jerk' : lift==='cj' ? 'Bench' : 'Complete';
+    document.getElementById('break-phase').textContent = 'Next: ' + nextLabel;
+    breakCard.style.display = 'block';
+  } else {
+    breakCard.style.display = 'none';
+  }
+
+  // Phase done banner
+  const phaseDoneDiv = document.getElementById('phase-done');
+  if (lift === 'complete') {
+    phaseDoneDiv.style.display = 'block';
+    document.getElementById('phase-done-text').textContent = 'Meet Complete 🏆';
+  } else if (phaseComplete) {
+    phaseDoneDiv.style.display = 'block';
+    document.getElementById('phase-done-text').textContent = (STATUS_LABEL[lift]||lift) + ' — Phase Complete';
+  } else {
+    phaseDoneDiv.style.display = 'none';
+  }
+
+  const nowDiv     = document.getElementById('now-lifting');
+  const waitingDiv = document.getElementById('waiting-msg');
+  const clockEl    = document.getElementById('now-clock');
+
+  // Reset clock state before each render
+  clockEl.dataset.clockStart    = '';
+  clockEl.dataset.clockDuration = '';
+  delete clockEl.dataset.clockPaused;
+  clockEl.style.display = 'none';
+
+  if (current) {
+    // NOW LIFTING — active lifter
+    nowDiv.style.display     = 'block';
+    nowDiv.style.borderColor = '#C9A84C';
+    waitingDiv.style.display = 'none';
+    document.getElementById('now-label').textContent = 'NOW LIFTING';
+    document.getElementById('now-label').style.color = '#C9A84C';
+    document.getElementById('now-result').style.display = 'none';
+
+    const idx     = _curIdx(current, lift);
+    const att     = current[lift][idx];
+    const school  = m.schools.find(s => s.id === current.schoolId);
+    const ordinal = ['1st','2nd','3rd'][idx] || (idx+1)+'th';
+
+    document.getElementById('now-name').textContent    = current.publicOptOut ? 'Athlete' : esc(current.name);
+    document.getElementById('now-meta').textContent    = (current.publicOptOut ? '' : (school?.name||'') + ' · ') + current.wc + ' lbs';
+    document.getElementById('now-weight').innerHTML    = att.declared + ' <span>lbs</span>';
+    document.getElementById('now-attempt').textContent = ordinal + ' attempt — ' + (STATUS_LABEL[lift]||lift);
+    document.getElementById('now-dots').innerHTML      = _dots(current[lift], idx);
+
+    if (ps.clockPausedRemaining != null) {
+      clockEl.dataset.clockPaused = ps.clockPausedRemaining;
+      clockEl.style.display = 'block';
+      clockEl.style.opacity = '0.6';
+    } else if (ps.clockStart && ps.clockDuration) {
+      clockEl.dataset.clockStart    = ps.clockStart;
+      clockEl.dataset.clockDuration = ps.clockDuration;
+      clockEl.style.display = 'block';
+      clockEl.style.opacity = '1';
+    }
+
+    // ON DECK
+    document.getElementById('queue-label').style.display = onDeck.length ? 'block' : 'none';
+    document.getElementById('queue').innerHTML = onDeck.map((e, qi) => {
+      const qi_idx = _curIdx(e, lift);
+      const qAtt   = e[lift][qi_idx];
+      const qSch   = m.schools.find(s => s.id === e.schoolId);
+      return `<div class="q-row">
+        <div class="q-num">${qi+2}</div>
+        <div style="flex:1;">
+          <div class="q-name">${e.publicOptOut ? 'Athlete' : esc(e.name)}</div>
+          <div class="q-meta">${e.publicOptOut ? '' : esc(qSch?.name||'')} · ${e.wc} lbs</div>
+          <div class="q-dots">${_dots(e[lift], qi_idx)}</div>
+        </div>
+        <div class="q-weight">${qAtt.declared} lbs</div>
+      </div>`;
+    }).join('');
+
+  } else if (m.lastLift && m.lastLift.platform === platformNum && !phaseComplete && !hasBreak) {
+    // PREVIOUS LIFT result while waiting for next check-in
+    const ll = m.lastLift;
+    nowDiv.style.display     = 'block';
+    nowDiv.style.borderColor = '#444';
+    waitingDiv.style.display = 'block';
+    document.getElementById('now-label').textContent = 'PREVIOUS LIFT';
+    document.getElementById('now-label').style.color = '#666';
+    document.getElementById('now-result').style.display = 'block';
+
+    const prevEnt = m.entries.find(e => e.id === ll.entryId);
+    const prevSch = m.schools.find(s => s.id === ll.schoolId);
+    const ordinal = ['1st','2nd','3rd'][ll.attemptIdx] || (ll.attemptIdx+1)+'th';
+
+    document.getElementById('now-name').textContent    = ll.publicOptOut ? 'Athlete' : esc(ll.name);
+    document.getElementById('now-meta').textContent    = (ll.publicOptOut ? '' : (prevSch?.name||'') + ' · ') + ll.wc + ' lbs · ' + ordinal + ' attempt';
+    document.getElementById('now-weight').innerHTML    = ll.declared + ' <span>lbs</span>';
+    document.getElementById('now-attempt').textContent = STATUS_LABEL[ll.lift] || ll.lift;
+    document.getElementById('now-dots').innerHTML      = prevEnt ? _dots(prevEnt[ll.lift], -1) : '';
+    document.getElementById('now-result').innerHTML    = ll.result === 'good'
+      ? '<div class="result-badge good">✓ GOOD LIFT</div>'
+      : '<div class="result-badge miss">✗ NO LIFT</div>';
+
+    document.getElementById('waiting-text').textContent = bw
+      ? 'Bar loaded at ' + bw + ' lbs — waiting for check-in…'
+      : 'Waiting for next athlete to check in…';
+    document.getElementById('queue-label').style.display = 'none';
+    document.getElementById('queue').innerHTML = '';
+
+  } else {
+    nowDiv.style.display  = 'none';
+    document.getElementById('queue-label').style.display = 'none';
+    document.getElementById('queue').innerHTML = '';
+    if (!phaseComplete && !hasBreak) {
+      waitingDiv.style.display = 'block';
+      document.getElementById('waiting-text').textContent = bw
+        ? 'Bar loaded at ' + bw + ' lbs — waiting for check-in…'
+        : 'Set bar weight to begin.';
+    } else {
+      waitingDiv.style.display = 'none';
+    }
+  }
+
+  // Judge lights
+  const votes = ps.judgeVotes || {};
+  [1,2,3].forEach(n => {
+    const el = document.getElementById('jl-' + n);
+    if (!el) return;
+    const v = votes[n];
+    el.className = 'judge-light' + (v === 'good' ? ' good' : v === 'no' ? ' no' : '');
+    el.textContent = n;
+  });
+  // Only show judge lights when a lift is in progress
+  const judgeRow = document.getElementById('judge-lights');
+  if (judgeRow) judgeRow.style.display = current ? 'flex' : 'none';
+
+  // ── Scoreboard (all meet entries) ──────────────────────────────────────────
+  const wcs   = _wcs(m.gender);
+  const oElig = m.entries.filter(e => e.discipline==='both'||e.discipline==='olympic');
+  const tElig = m.entries.filter(e => e.discipline==='both'||e.discipline==='traditional');
+
+  function attCell(att) {
+    if (!att) return `<span class="att att-empty">—</span>`;
+    if (att.result === 'good') return `<span class="att att-good">${att.declared}</span>`;
+    if (att.result === 'miss') return `<span class="att att-miss">${att.declared}</span>`;
+    return att.declared ? `<span class="att att-pending">${att.declared}</span>` : `<span class="att att-empty">—</span>`;
+  }
+
+  function attRow(atts, label) {
+    return `<div class="att-row"><span class="att-lbl">${label}</span>${(atts||[]).map(attCell).join('')}</div>`;
+  }
+
+  function indivSection(label, elig, totFn, snKey, lifts) {
+    if (!elig.length) return '';
+    let html = `<div style="font-size:11px;font-weight:700;letter-spacing:1px;color:#555;margin-bottom:8px;">${label}</div>`;
+    html += wcs.filter(wc => elig.some(e => e.wc===wc)).map(wc => {
+      const grp = elig.filter(e => e.wc===wc)
+        .map(e => ({ e, tot: totFn(e), tiebreak: _bestMade(e[snKey]) }))
+        .sort((a,b) => b.tot-a.tot || b.tiebreak-a.tiebreak);
+      let p = 0;
+      const rows = grp.map(r => {
+        if (r.tot > 0) p++;
+        const medal = p===1?'🥇':p===2?'🥈':p===3?'🥉':null;
+        const placeDisplay = r.tot > 0 ? (medal || p) : '—';
+        const sch  = m.schools.find(s => s.id === r.e.schoolId);
+        const atts = lifts.map(([key,lbl]) => attRow(r.e[key], lbl)).join('');
+        return `<div class="score-row${r.tot>0&&p===1?' first':''}">
+          <div class="score-place${r.tot>0&&p<=3?' gold':''}" style="font-size:${medal?'20px':'18px'}">${placeDisplay}</div>
+          <div style="flex:1;min-width:0;"><div class="score-name">${r.e.publicOptOut ? 'Athlete' : esc(r.e.name)}</div><div class="score-school">${r.e.publicOptOut ? '' : esc(sch?.name||'')}</div><div class="score-atts">${atts}</div></div>
+          <div class="score-total${!r.tot?' bomb':''}">${r.tot||'0'}</div>
+        </div>`;
+      }).join('');
+      return `<div class="wc-section"><div class="wc-title">${wc} LBS</div>${rows}</div>`;
+    }).join('');
+    return html;
+  }
+
+  document.getElementById('scoreboard').innerHTML =
+    indivSection('OLYMPIC', oElig, _olympicTotal, 'snatch', [['snatch','SN'],['cj','CJ']]) +
+    indivSection('TRADITIONAL', tElig, _traditionalTotal, 'cj', [['cj','CJ'],['bench','BN']]);
+
+  // Team scores
+  const N   = (m.schools||[]).length;
+  const pts = _teamPoints(N);
+  const sc  = {};
+  (m.schools||[]).forEach(s => { sc[s.id] = { name: s.name, olympic: 0, traditional: 0 }; });
+  wcs.filter(wc => oElig.some(e => e.wc===wc)).forEach(wc => {
+    const grp = oElig.filter(e => e.wc===wc).map(e => ({ e, tot: _olympicTotal(e) })).sort((a,b)=>b.tot-a.tot);
+    let p = 0; grp.forEach(r => { if (r.tot>0 && sc[r.e.schoolId] && p<pts.length) { sc[r.e.schoolId].olympic += pts[p++]; } });
+  });
+  wcs.filter(wc => tElig.some(e => e.wc===wc)).forEach(wc => {
+    const grp = tElig.filter(e => e.wc===wc).map(e => ({ e, tot: _traditionalTotal(e) })).sort((a,b)=>b.tot-a.tot);
+    let p = 0; grp.forEach(r => { if (r.tot>0 && sc[r.e.schoolId] && p<pts.length) { sc[r.e.schoolId].traditional += pts[p++]; } });
+  });
+  const teamSorted = Object.values(sc).map(s => ({ ...s, total: s.olympic + s.traditional })).sort((a,b) => b.total-a.total);
+  document.getElementById('team-scores').innerHTML = teamSorted.map((s, i) => `
+    <div class="team-row${i===0?' first':''}">
+      <div class="team-place" style="color:${i===0?'#C9A84C':'#555'}">${i+1}</div>
+      <div class="team-name">${esc(s.name)}</div>
+      <div class="team-pts">${s.total}</div>
+    </div>`).join('');
+}
+
+// ── Lifter clock (200ms tick) ─────────────────────────────────────────────────
+setInterval(() => {
+  const el = document.getElementById('now-clock');
+  if (!el || el.style.display === 'none') return;
+  if (el.dataset.clockPaused !== undefined && el.dataset.clockPaused !== '') {
+    const rem  = Math.max(0, parseInt(el.dataset.clockPaused));
+    const mins = Math.floor(rem / 60000);
+    const secs = Math.floor((rem % 60000) / 1000);
+    el.textContent = mins + ':' + String(secs).padStart(2, '0');
+    el.style.color = rem <= 10000 ? '#E07070' : rem <= 30000 ? '#E0A040' : '#5EC08A';
+    return;
+  }
+  const start    = parseInt(el.dataset.clockStart);
+  const duration = parseInt(el.dataset.clockDuration);
+  if (!start || !duration) return;
+  const rem  = Math.max(0, duration * 1000 - (Date.now() - start));
+  const mins = Math.floor(rem / 60000);
+  const secs = Math.floor((rem % 60000) / 1000);
+  el.textContent = mins + ':' + String(secs).padStart(2, '0');
+  el.style.color = rem <= 10000 ? '#E07070' : rem <= 30000 ? '#E0A040' : '#5EC08A';
+}, 200);
+
+// ── Break timer countdown (250ms tick) ────────────────────────────────────────
+setInterval(() => {
+  if (!_ps) return;
+  const card      = document.getElementById('break-card');
+  const countdown = document.getElementById('break-countdown');
+  const paused    = _ps.breakPausedRem;
+  const endMs     = _ps.breakEndMs;
+  let rem = null;
+  if (paused != null)   rem = Math.max(0, paused);
+  else if (endMs)       rem = Math.max(0, endMs - Date.now());
+  if (rem !== null && card.style.display !== 'none') {
+    const mins  = Math.floor(rem / 60000);
+    const secs  = Math.floor((rem % 60000) / 1000);
+    const color = rem < 10000 ? '#E07070' : rem < 30000 ? '#E0A040' : '#C9A84C';
+    countdown.textContent    = mins + ':' + String(secs).padStart(2, '0');
+    countdown.style.color    = color;
+    card.style.borderColor   = color;
+    card.style.opacity       = paused != null ? '0.7' : '1';
+  }
+}, 250);
+</script>
+</body>
+</html>
