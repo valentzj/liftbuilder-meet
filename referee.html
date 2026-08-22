@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-src 'none'; base-uri 'self'; connect-src 'self' ws: wss:;">
+<title>LiftBuilder — Referee</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --dark: #0E0E0E; --dark2: #1a1a1a; --dark3: #252525;
+    --gold: #C9A84C; --green: #5EC08A; --red: #E07070; --white: #F0F4F8; --muted: #C8C8C8;
+  }
+  body {
+    background: var(--dark); color: var(--white);
+    font-family: Arial, sans-serif; height: 100vh;
+    display: flex; flex-direction: column; overflow: hidden; user-select: none;
+  }
+  #header {
+    background: #161616; border-bottom: 2px solid var(--gold);
+    padding: 12px 20px; display: flex; align-items: center; gap: 12px;
+  }
+  #seat-badge {
+    font-size: 13px; font-weight: 700; letter-spacing: 2px; color: var(--gold);
+    padding: 4px 12px; background: rgba(201,168,76,.15); border-radius: 4px;
+  }
+  #platform-badge { font-size: 13px; color: var(--muted); }
+  #conn-badge {
+    margin-left: auto; font-size: 11px; font-weight: 700;
+    letter-spacing: 1px; padding: 2px 10px; border-radius: 4px;
+  }
+  #conn-badge.ok  { background: rgba(94,192,138,.15); color: var(--green); }
+  #conn-badge.off { background: rgba(224,112,112,.15); color: var(--red); }
+
+  #lift-info {
+    padding: 20px 24px; border-bottom: 1px solid var(--dark3);
+    text-align: center;
+  }
+  #lift-name   { font-size: 32px; font-weight: 700; line-height: 1.1; }
+  #lift-meta   { font-size: 15px; color: var(--muted); margin-top: 6px; }
+  #lift-weight { font-size: 64px; font-weight: 700; color: var(--gold); line-height: 1; margin-top: 10px; }
+  #lift-weight span { font-size: 24px; color: #555; }
+  #lift-attempt { font-size: 15px; color: var(--muted); margin-top: 4px; }
+  #lift-phase  { font-size: 12px; font-weight: 700; letter-spacing: 2px; color: var(--gold); margin-bottom: 10px; }
+
+  #waiting-state {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-size: 20px; color: var(--muted); text-align: center; padding: 24px;
+  }
+
+  #vote-area {
+    display: none; flex: 1; flex-direction: column; align-items: center;
+    justify-content: center; gap: 24px; padding: 28px;
+  }
+  .vote-btn {
+    width: 100%; max-width: 320px; border: none; border-radius: 12px;
+    cursor: pointer; font-size: 28px; font-weight: 900; letter-spacing: 2px;
+    padding: 28px 0; transition: opacity .15s; touch-action: manipulation;
+  }
+  .vote-btn:disabled { opacity: .3; cursor: default; }
+  #btn-good { background: #1e4a2a; border: 3px solid var(--green); color: var(--green); }
+  #btn-good:not(:disabled):active  { background: #2a6a3a; }
+  #btn-no   { background: #4a1e1e; border: 3px solid var(--red);   color: var(--red);   }
+  #btn-no:not(:disabled):active    { background: #6a2a2a; }
+
+  #voted-state {
+    display: none; flex: 1; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px; text-align: center; padding: 24px;
+  }
+  #voted-result { font-size: 52px; font-weight: 900; }
+  #voted-result.good { color: var(--green); }
+  #voted-result.no   { color: var(--red); }
+  #voted-waiting { font-size: 16px; color: var(--muted); }
+
+  #lights-row {
+    display: flex; gap: 16px; justify-content: center;
+    padding: 14px 24px; border-top: 1px solid var(--dark3); background: var(--dark2);
+  }
+  .light {
+    width: 44px; height: 44px; border-radius: 50%; border: 2px solid #333;
+    background: #222; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #555; transition: all .2s;
+  }
+  .light.good { background: #1e5c35; border-color: var(--green); color: var(--green); }
+  .light.no   { background: #5c1e1e; border-color: var(--red);   color: var(--red);   }
+  .light.me   { box-shadow: 0 0 0 3px rgba(201,168,76,.6); }
+
+  #offline-banner {
+    position: fixed; inset: 0; background: rgba(0,0,0,.85);
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px; z-index: 999; text-align: center;
+  }
+  #offline-banner p { font-size: 20px; font-weight: 700; color: var(--red); }
+  #offline-banner small { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div id="seat-badge">JUDGE —</div>
+  <div id="platform-badge">Platform —</div>
+  <div id="conn-badge" class="off">OFFLINE</div>
+</div>
+
+<div id="lift-info">
+  <div id="lift-phase">—</div>
+  <div id="lift-name">—</div>
+  <div id="lift-meta"></div>
+  <div id="lift-weight">— <span>lbs</span></div>
+  <div id="lift-attempt"></div>
+</div>
+
+<div id="waiting-state">Waiting for athlete to check in…</div>
+
+<div id="vote-area">
+  <button class="vote-btn" id="btn-good" onclick="vote('good')">✓ GOOD LIFT</button>
+  <button class="vote-btn" id="btn-no"   onclick="vote('no')">✗ NO LIFT</button>
+</div>
+
+<div id="voted-state">
+  <div id="voted-result">—</div>
+  <div id="voted-waiting">Waiting for other judges…</div>
+</div>
+
+<div id="lights-row">
+  <div class="light" id="l-1" title="Judge 1">1</div>
+  <div class="light" id="l-2" title="Judge 2">2</div>
+  <div class="light" id="l-3" title="Judge 3">3</div>
+</div>
+
+<div id="offline-banner">
+  <p>CONNECTION LOST</p>
+  <small>Attempting to reconnect…</small>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+'use strict';
+
+const parts      = location.pathname.split('/');
+const platformNum = parseInt(parts[2]) || 1;
+const seat        = parseInt(parts[3]) || 1;
+const seatLabels  = { 1: 'LEFT', 2: 'CENTER', 3: 'RIGHT' };
+
+document.getElementById('seat-badge').textContent     = 'JUDGE ' + seatLabels[seat];
+document.getElementById('platform-badge').textContent = 'Platform ' + platformNum;
+
+const STATUS_LABEL = { snatch:'Snatch', cj:'Clean & Jerk', bench:'Bench', complete:'Complete' };
+
+const _meetToken = new URLSearchParams(location.search).get('pin') || '';
+const socket     = io({ auth: { token: _meetToken } });
+let _meet     = null;
+let _ps       = null;
+let _voted    = false;
+let _prevLiftKey = null;
+
+socket.on('connect', () => {
+  document.getElementById('conn-badge').textContent = 'LIVE';
+  document.getElementById('conn-badge').className   = 'conn-badge ok';
+  document.getElementById('offline-banner').style.display = 'none';
+  socket.emit('join', platformNum);
+});
+socket.on('disconnect', () => {
+  document.getElementById('conn-badge').textContent = 'OFFLINE';
+  document.getElementById('conn-badge').className   = 'conn-badge off';
+  document.getElementById('offline-banner').style.display = 'flex';
+});
+
+socket.on('state-update', (meetState) => {
+  _meet = meetState;
+  _ps   = meetState.platformStates?.[platformNum] || { status: meetState.status, checkedIn: [], judgeVotes: {} };
+
+  // Detect new lift (checkedIn changed or lastLift changed) → reset voted state
+  const checkedInKey = (_ps.checkedIn || [])[0] || '';
+  const lastKey      = meetState.lastLift ? `${meetState.lastLift.entryId}:${meetState.lastLift.attemptIdx}` : '';
+  const liftKey      = checkedInKey || lastKey;
+  if (liftKey !== _prevLiftKey) {
+    _voted = false;
+    _prevLiftKey = liftKey;
+  }
+
+  render();
+});
+
+function vote(result) {
+  if (_voted) return;
+  _voted = true;
+  socket.emit('judge-vote', { pNum: platformNum, seat, result });
+  showVoted(result);
+}
+
+function showVoted(result) {
+  document.getElementById('vote-area').style.display   = 'none';
+  document.getElementById('voted-state').style.display = 'flex';
+  const el = document.getElementById('voted-result');
+  el.textContent = result === 'good' ? '✓ GOOD' : '✗ NO LIFT';
+  el.className   = result === 'good' ? 'good' : 'no';
+}
+
+function render() {
+  if (!_meet || !_ps) return;
+  const m    = _meet;
+  const ps   = _ps;
+  const lift = ps.status || m.status;
+  const ciSet = new Set(ps.checkedIn || []);
+  const pEntries = m.entries.filter(e => e.platform === platformNum);
+  function curIdx(e) { return e[lift].findIndex(a => a.result === null); }
+  function eligible(e) {
+    if (lift==='snatch') return e.discipline==='both'||e.discipline==='olympic'||e.discipline==='exhibition';
+    if (lift==='cj')     return true;
+    if (lift==='bench')  return e.discipline==='both'||e.discipline==='traditional'||e.discipline==='exhibition';
+    return false;
+  }
+  const elig = pEntries.filter(e => eligible(e) && curIdx(e) >= 0);
+  const current = elig.find(e => ciSet.has(e.id + ':' + curIdx(e))) || null;
+
+  // Lift info panel
+  const liftInfoEl = document.getElementById('lift-info');
+  if (lift === 'complete') {
+    liftInfoEl.style.display = 'none';
+  } else if (current) {
+    liftInfoEl.style.display = 'block';
+    const idx     = curIdx(current);
+    const att     = current[lift][idx];
+    const school  = m.schools.find(s => s.id === current.schoolId);
+    const ordinal = ['1st','2nd','3rd'][idx] || (idx+1)+'th';
+    document.getElementById('lift-phase').textContent   = STATUS_LABEL[lift] || lift;
+    document.getElementById('lift-name').textContent    = current.publicOptOut ? 'Athlete' : (current.name || '—');
+    document.getElementById('lift-meta').textContent    = current.publicOptOut ? '' : ((school?.name || '') + ' · ' + current.wc + ' lbs');
+    document.getElementById('lift-weight').innerHTML    = (att.declared || '—') + ' <span>lbs</span>';
+    document.getElementById('lift-attempt').textContent = ordinal + ' attempt';
+  } else if (m.lastLift && m.lastLift.platform === platformNum) {
+    liftInfoEl.style.display = 'block';
+    const ll = m.lastLift;
+    const prevSch = m.schools.find(s => s.id === ll.schoolId);
+    document.getElementById('lift-phase').textContent   = STATUS_LABEL[ll.lift] || ll.lift;
+    document.getElementById('lift-name').textContent    = ll.publicOptOut ? 'Athlete' : (ll.name || '—');
+    document.getElementById('lift-meta').textContent    = ll.publicOptOut ? '' : ((prevSch?.name || '') + ' · ' + ll.wc + ' lbs');
+    document.getElementById('lift-weight').innerHTML    = (ll.declared || '—') + ' <span>lbs</span>';
+    document.getElementById('lift-attempt').textContent = (['1st','2nd','3rd'][ll.attemptIdx] || '') + ' attempt — ' + (ll.result === 'good' ? '✓ GOOD LIFT' : '✗ NO LIFT');
+  } else {
+    liftInfoEl.style.display = 'none';
+  }
+
+  // Vote / voted area
+  const votes = ps.judgeVotes || {};
+  const myVote = votes[seat];
+
+  if (!current) {
+    // No active lift — reset
+    _voted = false;
+    document.getElementById('waiting-state').style.display = 'flex';
+    document.getElementById('vote-area').style.display     = 'none';
+    document.getElementById('voted-state').style.display   = 'none';
+  } else if (_voted || myVote !== null && myVote !== undefined) {
+    document.getElementById('waiting-state').style.display = 'none';
+    document.getElementById('vote-area').style.display     = 'none';
+    document.getElementById('voted-state').style.display   = 'flex';
+    if (myVote) {
+      const el = document.getElementById('voted-result');
+      el.textContent = myVote === 'good' ? '✓ GOOD' : '✗ NO LIFT';
+      el.className   = myVote === 'good' ? 'good' : 'no';
+    }
+  } else {
+    document.getElementById('waiting-state').style.display = 'none';
+    document.getElementById('vote-area').style.display     = 'flex';
+    document.getElementById('voted-state').style.display   = 'none';
+    document.getElementById('btn-good').disabled = false;
+    document.getElementById('btn-no').disabled   = false;
+  }
+
+  // Judge lights
+  [1,2,3].forEach(n => {
+    const el = document.getElementById('l-' + n);
+    if (!el) return;
+    const v = votes[n];
+    el.className = 'light' + (v === 'good' ? ' good' : v === 'no' ? ' no' : '') + (n === seat ? ' me' : '');
+    el.textContent = n;
+  });
+}
+</script>
+</body>
+</html>
