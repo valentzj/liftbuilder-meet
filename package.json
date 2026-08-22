@@ -1,0 +1,13 @@
+{
+  "name": "liftbuilder-meet",
+  "version": "1.0.0",
+  "description": "LiftBuilder Meet — web-based meet hosting with multi-platform support",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  }
+}
