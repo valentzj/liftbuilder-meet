@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-src 'none'; base-uri 'self'; connect-src 'self' ws: wss:;">
+<title>LiftBuilder — Live Scoreboard</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --dark:#0E0E0E;--dark2:#1a1a1a;--dark3:#252525;--dark4:#2e2e2e;
+  --white:#F0F4F8;--muted:#666;
+  --gold:#C9A84C;--gold-a15:rgba(201,168,76,.15);--gold-a30:rgba(201,168,76,.3);
+  --green:#5EC08A;--red:#E07070;
+}
+body{background:var(--dark);color:var(--white);font-family:Arial,sans-serif;min-height:100vh;display:flex;flex-direction:column;}
+
+#hdr{background:#161616;border-bottom:2px solid var(--gold);padding:12px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex-shrink:0;}
+#hdr-title{font-family:'Barlow Condensed',Arial,sans-serif;font-size:24px;font-weight:700;letter-spacing:1px;flex:1;}
+#hdr-sub{font-size:13px;color:var(--muted);}
+#conn-badge{font-size:11px;font-weight:700;letter-spacing:1px;padding:2px 10px;border-radius:4px;}
+#conn-badge.ok{background:rgba(94,192,138,.15);color:var(--green);}
+#conn-badge.off{background:rgba(224,112,112,.15);color:var(--red);}
+
+#platform-bar{display:flex;gap:10px;padding:12px 24px;background:#141414;border-bottom:1px solid #222;overflow-x:auto;flex-shrink:0;}
+.plat-chip{background:var(--dark2);border:1px solid var(--dark3);border-radius:6px;padding:8px 14px;min-width:140px;flex-shrink:0;}
+.plat-chip.live{border-color:var(--gold-a30);}
+.plat-chip.done{border-color:#5EC08A;}
+.plat-num{font-family:'Barlow Condensed',Arial,sans-serif;font-size:10px;font-weight:700;letter-spacing:1.5px;margin-bottom:3px;}
+.plat-phase{font-size:13px;font-weight:600;}
+.plat-lifter{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;}
+
+#main{display:grid;grid-template-columns:1fr 300px;flex:1;overflow:hidden;}
+#left{padding:20px 24px;overflow-y:auto;}
+#right{background:#141414;border-left:1px solid #222;padding:20px;overflow-y:auto;}
+
+.section-hd{font-family:'Barlow Condensed',Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;color:var(--gold);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--gold-a15);}
+.wc-block{margin-bottom:20px;}
+.wc-hd{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;background:#1c1c1c;padding:3px 8px;border-radius:3px;margin-bottom:6px;}
+.sr{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:5px;margin-bottom:3px;}
+.sr.first{background:var(--gold-a15);}
+.sr-medal{font-size:20px;width:28px;text-align:center;flex-shrink:0;}
+.sr-pl{font-size:16px;font-weight:700;width:28px;text-align:center;flex-shrink:0;color:var(--muted);}
+.sr-info{flex:1;min-width:0;}
+.sr-name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sr-sch{font-size:11px;color:var(--muted);}
+.sr-tot{font-family:'Barlow Condensed',Arial,sans-serif;font-size:22px;font-weight:700;color:var(--gold);flex-shrink:0;}
+.sr-tot.zero{color:var(--red);font-size:15px;font-weight:600;}
+.sr-atts{display:flex;flex-direction:column;gap:3px;margin-top:5px;}
+.att-row{display:flex;align-items:center;gap:4px;}
+.att-lbl{font-size:9px;font-weight:700;letter-spacing:1px;color:var(--muted);width:18px;flex-shrink:0;}
+.att{font-family:'Barlow Condensed',Arial,sans-serif;font-size:12px;font-weight:700;min-width:36px;text-align:center;padding:2px 5px;border-radius:3px;}
+.att-good{background:rgba(94,192,138,.2);color:var(--green);border:1px solid rgba(94,192,138,.4);}
+.att-miss{background:rgba(224,112,112,.15);color:var(--red);border:1px solid rgba(224,112,112,.35);text-decoration:line-through;}
+.att-pending{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid #333;}
+.att-empty{color:#444;border:1px solid #2a2a2a;background:transparent;}
+
+.section-hd-sm{font-family:'Barlow Condensed',Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;color:var(--gold);margin-bottom:12px;}
+.ts{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:6px;margin-bottom:6px;}
+.ts.first{background:var(--gold-a15);border:1px solid var(--gold-a30);}
+.ts-rank{font-size:18px;font-weight:700;width:26px;flex-shrink:0;color:var(--muted);}
+.ts-name{flex:1;font-size:15px;font-weight:600;}
+.ts-pts{font-family:'Barlow Condensed',Arial,sans-serif;font-size:28px;font-weight:700;color:var(--gold);}
+
+#ticker{background:#141414;border-top:1px solid #222;padding:8px 24px;font-size:12px;color:var(--muted);flex-shrink:0;min-height:34px;}
+.ticker-good{color:var(--green);font-weight:600;}
+.ticker-miss{color:var(--red);font-weight:600;}
+
+#no-data{display:flex;align-items:center;justify-content:center;flex:1;font-size:22px;color:#333;flex-direction:column;gap:10px;}
+
+@media(max-width:768px){
+  #main{grid-template-columns:1fr;overflow:auto;}
+  #right{border-left:none;border-top:1px solid #222;}
+  #hdr-title{font-size:18px;}
+  body{overflow-y:auto;}
+}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div id="hdr-title">LiftBuilder</div>
+  <div id="hdr-sub">Live Scoreboard</div>
+  <div id="conn-badge" class="off">OFFLINE</div>
+</div>
+
+<div id="platform-bar" style="display:none;"></div>
+
+<div id="main" style="display:none;">
+  <div id="left"></div>
+  <div id="right">
+    <div class="section-hd-sm">TEAM SCORES</div>
+    <div id="team-scores"></div>
+  </div>
+</div>
+
+<div id="no-data">
+  <div>Waiting for meet data…</div>
+  <div style="font-size:14px;color:#444;">The meet director must start the platform server.</div>
+</div>
+
+<div id="ticker" style="display:none;"><span id="ticker-inner"></span></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+'use strict';
+
+const _meetToken = new URLSearchParams(location.search).get('pin') || '';
+const socket     = io({ auth: { token: _meetToken } });
+let _meet = null;
+
+const STATUS_LABEL = { snatch:'Snatch', cj:'Clean & Jerk', bench:'Bench', complete:'Complete' };
+const GIRLS_WC = ['101','110','119','129','139','154','169','183','199','UNL'];
+const BOYS_WC  = ['119','129','139','154','169','183','199','219','238','HWT'];
+
+function esc(s){ const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
+function dName(e){ return e.publicOptOut ? 'Athlete' : esc(e.name); }
+function _eligibleForLift(e,lift){
+  if(lift==='snatch') return e.discipline==='both'||e.discipline==='olympic'||e.discipline==='exhibition';
+  if(lift==='cj')     return true;
+  if(lift==='bench')  return e.discipline==='both'||e.discipline==='traditional'||e.discipline==='exhibition';
+  return false;
+}
+function _bestMade(atts){ const w=atts.filter(a=>a.result==='good').map(a=>a.declared); return w.length?Math.max(...w):0; }
+function _olympicTotal(e){ const s=_bestMade(e.snatch),c=_bestMade(e.cj); return s>0&&c>0?s+c:0; }
+function _traditionalTotal(e){ const c=_bestMade(e.cj),b=_bestMade(e.bench); return c>0&&b>0?c+b:0; }
+function _rankCmp(a,b){ if(b.tot!==a.tot) return b.tot-a.tot; const wA=parseFloat(a.e.weighIn)||parseFloat(a.e.wc)||999, wB=parseFloat(b.e.weighIn)||parseFloat(b.e.wc)||999; return wA-wB; }
+function _teamPoints(N){
+  if(N>=5) return [7,5,4,3,2,1];
+  if(N===4) return [6,4,3,2,1];
+  if(N===3) return [5,3,2,1];
+  return [5,3,1];
+}
+
+socket.on('connect', ()=>{
+  document.getElementById('conn-badge').textContent='LIVE';
+  document.getElementById('conn-badge').className='conn-badge ok';
+});
+socket.on('disconnect', ()=>{
+  document.getElementById('conn-badge').textContent='OFFLINE';
+  document.getElementById('conn-badge').className='conn-badge off';
+});
+socket.on('state-update', (meetState)=>{ _meet=meetState; render(); });
+
+function render(){
+  if(!_meet) return;
+  const m   = _meet;
+  const wcs = m.gender==='Girls'?GIRLS_WC:BOYS_WC;
+
+  document.getElementById('hdr-title').textContent = m.name||'LiftBuilder';
+
+  // Platform status bar
+  const platBar = document.getElementById('platform-bar');
+  if((m.numPlatforms||0)>1){
+    platBar.style.display='';
+    const connected = m._connectedPlatforms||[];
+    platBar.innerHTML = Array.from({length:m.numPlatforms},(_,i)=>{
+      const pNum = i+1;
+      const ps   = m.platformStates?.[pNum]||{};
+      const pSt  = ps.status||m.status;
+      const isDone  = pSt==='complete';
+      const isConn  = connected.includes(pNum);
+      const pEntries = m.entries.filter(e=>e.platform===pNum);
+      const ciSet = new Set(ps.checkedIn||[]);
+      let nowName='';
+      for(const e of pEntries){
+        const idx=e[pSt]?.findIndex(a=>a.result===null)??-1;
+        if(idx>=0&&ciSet.has(e.id+':'+idx)){ nowName=e.publicOptOut?'Athlete':e.name; break; }
+      }
+      const dotColor = isDone?'var(--green)':isConn?'var(--gold)':'#444';
+      return `<div class="plat-chip ${isDone?'done':isConn?'live':''}">
+        <div class="plat-num"><span style="color:${dotColor};">●</span> PLATFORM ${pNum}</div>
+        <div class="plat-phase">${isDone?'✓ Complete':STATUS_LABEL[pSt]||esc(pSt)}</div>
+        ${nowName?`<div class="plat-lifter">${esc(nowName)}</div>`:'<div class="plat-lifter" style="color:#444;">Waiting…</div>'}
+      </div>`;
+    }).join('');
+  } else {
+    platBar.style.display='none';
+  }
+
+  // Standings
+  const oElig = m.entries.filter(e=>e.discipline==='both'||e.discipline==='olympic');
+  const tElig = m.entries.filter(e=>e.discipline==='both'||e.discipline==='traditional');
+
+  function attCell(att){
+    if(!att) return `<span class="att att-empty">—</span>`;
+    if(att.result==='good') return `<span class="att att-good">${att.declared}</span>`;
+    if(att.result==='miss') return `<span class="att att-miss">${att.declared}</span>`;
+    return att.declared ? `<span class="att att-pending">${att.declared}</span>` : `<span class="att att-empty">—</span>`;
+  }
+
+  function attRow(atts, label){
+    return `<div class="att-row"><span class="att-lbl">${label}</span>${atts.map(attCell).join('')}</div>`;
+  }
+
+  function buildSection(label,elig,totFn,lifts){
+    const usedWcs = wcs.filter(wc=>elig.some(e=>e.wc===wc));
+    if(!usedWcs.length) return '';
+    let html=`<div class="section-hd">${label}</div>`;
+    html+=usedWcs.map(wc=>{
+      const grp=elig.filter(e=>e.wc===wc).map(e=>({e,tot:totFn(e)})).sort(_rankCmp);
+      let placed=0;
+      return `<div class="wc-block"><div class="wc-hd">${wc} LBS</div>`+
+        grp.map(r=>{
+          if(r.tot>0) placed++;
+          const medal = placed===1?'🥇':placed===2?'🥈':placed===3?'🥉':null;
+          const sch   = m.schools.find(s=>s.id===r.e.schoolId);
+          const atts  = lifts.map(([key,lbl])=>attRow(r.e[key]||[],lbl)).join('');
+          return `<div class="sr${r.tot>0&&placed===1?' first':''}">
+            ${medal?`<div class="sr-medal">${medal}</div>`:`<div class="sr-pl">${r.tot>0?placed:'—'}</div>`}
+            <div class="sr-info">
+              <div class="sr-name">${dName(r.e)}</div>
+              <div class="sr-sch">${r.e.publicOptOut ? '' : esc(sch?.name||'')}</div>
+              <div class="sr-atts">${atts}</div>
+            </div>
+            <div class="sr-tot${!r.tot?' zero':''}">${r.tot||'—'}</div>
+          </div>`;
+        }).join('')+'</div>';
+    }).join('');
+    return html;
+  }
+
+  const leftHtml = buildSection('OLYMPIC',oElig,_olympicTotal,[['snatch','SN'],['cj','CJ']])+
+                   buildSection('TRADITIONAL',tElig,_traditionalTotal,[['cj','CJ'],['bench','BN']]);
+  document.getElementById('left').innerHTML = leftHtml||'<div style="color:#444;padding:40px;text-align:center;font-size:14px;">No entries yet</div>';
+
+  // Team scores
+  const N   = (m.schools||[]).length;
+  const pts = _teamPoints(N);
+  const sc  = {};
+  (m.schools||[]).forEach(s=>{ sc[s.id]={name:s.name,olympic:0,traditional:0}; });
+  wcs.filter(wc=>oElig.some(e=>e.wc===wc)).forEach(wc=>{
+    const grp=oElig.filter(e=>e.wc===wc).map(e=>({e,tot:_olympicTotal(e)})).sort(_rankCmp);
+    let p=0; grp.forEach(r=>{ if(r.tot>0&&sc[r.e.schoolId]&&p<pts.length) sc[r.e.schoolId].olympic+=pts[p++]; });
+  });
+  wcs.filter(wc=>tElig.some(e=>e.wc===wc)).forEach(wc=>{
+    const grp=tElig.filter(e=>e.wc===wc).map(e=>({e,tot:_traditionalTotal(e)})).sort(_rankCmp);
+    let p=0; grp.forEach(r=>{ if(r.tot>0&&sc[r.e.schoolId]&&p<pts.length) sc[r.e.schoolId].traditional+=pts[p++]; });
+  });
+  const sorted=Object.values(sc).map(s=>({...s,total:s.olympic+s.traditional})).sort((a,b)=>b.total-a.total);
+  document.getElementById('team-scores').innerHTML=sorted.length?sorted.map((s,i)=>`
+    <div class="ts${i===0?' first':''}">
+      <div class="ts-rank" style="${i===0?'color:var(--gold);':''}">${i===0?'🥇':i+1}</div>
+      <div class="ts-name">${esc(s.name)}</div>
+      <div class="ts-pts">${s.total}</div>
+    </div>`).join(''):'<div style="color:#444;font-size:14px;">No scores yet</div>';
+
+  // Last lift ticker
+  const ticker = document.getElementById('ticker');
+  if(m.lastLift){
+    const ll  = m.lastLift;
+    const sch = m.schools.find(s=>s.id===ll.schoolId);
+    const badge = ll.result==='good'
+      ? '<span class="ticker-good">✓ GOOD LIFT</span>'
+      : '<span class="ticker-miss">✗ NO LIFT</span>';
+    ticker.style.display='';
+    document.getElementById('ticker-inner').innerHTML =
+      `Last lift: <strong>${ll.publicOptOut ? 'Athlete' : esc(ll.name)}</strong> (${ll.publicOptOut ? '' : esc(sch?.name||'')}) — ${ll.declared} lbs ${STATUS_LABEL[ll.lift]||esc(ll.lift)} — ${badge}`;
+  } else {
+    ticker.style.display='none';
+  }
+
+  const hasData = (m.entries||[]).length>0;
+  document.getElementById('main').style.display   = hasData?'':'none';
+  document.getElementById('no-data').style.display = hasData?'none':'flex';
+}
+</script>
+</body>
+</html>
